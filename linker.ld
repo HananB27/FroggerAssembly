@@ -1,7 +1,5 @@
-ENTRY(_start)
-SECTIONS {
-    . = 0x08000000; /* GBA ROM start address */
-    .text : {
-        *(.text)
-    }
+SECTIONS
+{
+    . = 0x08000000;  /* GBA ROM starts at 0x08000000 */
+    .text : { *(.text) }
 }

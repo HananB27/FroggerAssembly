@@ -1,18 +1,15 @@
-ARCH     := arm-none-eabi
-AS       := $(ARCH)-as
-LD       := $(ARCH)-ld
-OBJCOPY  := $(ARCH)-objcopy
+OBJFILES = main.o
 
-TARGET   := game
-SRC      := boot.s
-OUT      := $(TARGET).gba
-GBAFIX   := C:/devkitPro/tools/bin/gbafix.exe
+all: main.gba
 
-all:
-	$(AS) -o boot.o $(SRC)
-	$(LD) -T linker.ld -o $(TARGET).elf boot.o
-	$(OBJCOPY) -O binary $(TARGET).elf $(OUT)
-	$(GBAFIX) $(OUT) -t"TEST"
+%.o: %.s
+	arm-none-eabi-as -mcpu=arm7tdmi -g -o $@ $<
+
+main.elf: $(OBJFILES)
+	arm-none-eabi-ld -T linker.ld -o $@ $^
+
+main.gba: main.elf
+	arm-none-eabi-objcopy -O binary $< $@
 
 clean:
-	rm -f boot.o $(TARGET).elf $(OUT)
+	rm -f *.o *.elf *.gba assets/*.bin
