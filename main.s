@@ -1,67 +1,59 @@
-.section .text
-.global _start
-.align 2
+	.equ MODE3, 0x0003
+	.equ BG2_ENABLE, 0x0400
+	.equ REG_DISPCNT, 0x4000000
+	.equ VRAM, 0x6000000
+	.equ SCREEN_WIDTH, 240
+	.equ SCREEN_HEIGHT, 160
 
-@ Memory addresses
-.equ REG_DISPCNT,   0x4000000  @ Display control register
-.equ BG0CNT,        0x4000008  @ Background 0 Control register
-.equ BG0HOFS,       0x4000010  @ BG0 horizontal offset
-.equ BG0VOFS,       0x4000012  @ BG0 vertical offset
-.equ BG0_CHAR_BASE, 0x6000000  @ Tile Character Base (VRAM for tileset)
-.equ BG0_MAP_BASE,  0x6004000  @ Tile Map Base (VRAM for map)
-.equ BG_PALETTE,    0x5000000  @ Background palette memory
+	.syntax unified
+	.cpu arm7tdmi
+	.text
+	.global main
 
-@ Entry point
-_start:
-    ldr r0, =REG_DISPCNT
-    ldr r1, =0x100            @ Mode 0 | Enable BG0
-    str r1, [r0]
+	.section .rodata
+    .align 4
+    .global frog1_img_bin
+    .type frog1_img_bin, %object
+    .size frog1_img_bin, 512
+    frog1_img_bin:
+    .incbin "assets/frogs/frog1.img.bin"
 
-    ldr r0, =BG0CNT
-    ldr r1, =0x0000           @ Character Base Block 0, Map Base Block 31
-    str r1, [r0]
+main:
+	@ Set mode 3 and enable BG2
+	ldr r0, =REG_DISPCNT
+	ldr r1, =MODE3 | BG2_ENABLE
+	strh r1, [r0]
 
-@ Load Palette into Palette RAM
-    ldr r0, =BG_PALETTE       @ Load address for palette
-    ldr r1, =goal_palette
-    mov r2, #256              @ Number of colors to load
-palette_load_loop:
-    ldrh r3, [r1], #2
-    strh r3, [r0], #2
-    subs r2, r2, #1
-    bne palette_load_loop
+	@ Load frog image
+	ldr r4, =frog1_img_bin  @ Pointer to image data
+	ldr r5, =VRAM           @ Video memory location
+	ldr r6, =16             @ Frog width
+	ldr r7, =16             @ Frog height
 
-@ Load tile graphics into character memory
-    ldr r0, =BG0_CHAR_BASE
-    ldr r1, =goal_tiles
-    mov r2, #(512*8)          @ Number of bytes in tiles (adjust if needed)
-tile_load_loop:
-    ldmia r1!, {r3-r6}
-    stmia r0!, {r3-r6}
-    subs r2, r2, #16          @ Process 4 words at a time
-    bne tile_load_loop
+	@ Set position (X=100, Y=70)
+	mov r8, #100
+	mov r9, #70
 
-@ Load tilemap into map memory
-    ldr r0, =BG0_MAP_BASE
-    ldr r1, =goal_map
-    mov r2, #(32*32)          @ Tilemap size (32x32)
-map_load_loop:
-    ldrh r3, [r1], #2
-    strh r3, [r0], #2
-    subs r2, r2, #1
-    bne map_load_loop
+	@ Compute VRAM offset: (y * SCREEN_WIDTH + x) * 2
+	mov r10, #SCREEN_WIDTH
+	mul r10, r9, r10       @ r10 = y * SCREEN_WIDTH
+	add r5, r5, r10, lsl #1  @ VRAM address += y offset
+	add r5, r5, r8, lsl #1   @ VRAM address += x offset
 
-@ Infinite loop to keep program running
-loop:
-    b loop
+draw_frog:
+	push {r6, r7, r11}    @ Save width, height
 
-@ Background Data
-    .section .rodata
-goal_tiles:
-    .incbin "assets/goal.img.bin"   @ Include tile graphics
-goal_map:
-    .incbin "assets/goal.map.bin"   @ Include tilemap data
-goal_palette:
-    .incbin "assets/goal.pal.bin"   @ Include palette data
+draw_row:
+	ldrh r11, [r4], #2    @ Load pixel from image
+	strh r11, [r5], #2    @ Store to VRAM
+	subs r6, r6, #1       @ Decrement width counter
+	bne draw_row
 
-    .end
+	@ Move to next row
+	ldr r6, =16
+	add r5, r5, #(SCREEN_WIDTH - 16) * 2  @ Move to next row in VRAM
+	subs r7, r7, #1       @ Decrement height counter
+	bne draw_frog
+
+	pop {r6, r7, r11}     @ Restore registers
+	b .                   @ Infinite loop
