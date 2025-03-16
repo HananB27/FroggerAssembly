@@ -18,11 +18,28 @@
     frog1_img_bin:
     .incbin "assets/frogs/frog1.img.bin"
 
+    .global background_img_bin
+    .type background_img_bin, %object
+    .size background_img_bin, SCREEN_WIDTH * SCREEN_HEIGHT * 2
+    background_img_bin:
+    .incbin "assets/map/map.img.bin"
+
 main:
 	@ Set mode 3 and enable BG2
 	ldr r0, =REG_DISPCNT
 	ldr r1, =MODE3 | BG2_ENABLE
 	strh r1, [r0]
+
+	@ Load background image
+	ldr r4, =background_img_bin  @ Pointer to background image data
+	ldr r5, =VRAM                @ Video memory location
+	ldr r6, =SCREEN_WIDTH * SCREEN_HEIGHT  @ Total pixels
+
+load_background:
+	ldrh r7, [r4], #2    @ Load pixel from background image
+	strh r7, [r5], #2    @ Store to VRAM
+	subs r6, r6, #1       @ Decrement counter
+	bne load_background  @ Continue until done
 
 	@ Load frog image
 	ldr r4, =frog1_img_bin  @ Pointer to image data
