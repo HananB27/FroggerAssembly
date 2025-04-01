@@ -45,50 +45,66 @@ ProgramStart:
 	bl ShowSprite
 
 InfLoop:
-	mov r3,#0x4000130
-	ldrh r0,[r3]
-	and r0,r0,#0b0000000011110000
-	cmp r0,#0b0000000011110000
-	beq InfLoop
+    mov r3, #0x4000130
+WaitNoInput:
+    ldrh r0, [r3]
+    and r0, r0, #0b0000000011110000
+    cmp r0, #0b0000000011110000
+    bne WaitNoInput     ; Wait until no buttons pressed
 
-	bl RemoveSprite
+WaitForInput:
+    ldrh r0, [r3]
+    and r0, r0, #0b0000000011110000
+    cmp r0, #0b0000000011110000
+    beq WaitForInput    ; Wait until a direction is pressed
 
-	tst r0,#0b0000000001000000 ; Up
-	bne JoyNotUp
-	cmp.b r9,#0
-	beq JoyNotUp
-	sub.b r9,r9,#4
-	mov r6, #0
-JoyNotUp:
-	tst r0,#0b0000000010000000 ; Down
-	bne JoyNotDown
-	cmp.b r9,#160-8
-	beq JoyNotDown
-	add.b r9,r9,#4
-	mov r6, #1
-JoyNotDown:
-	tst r0,#0b0000000000100000 ; Left
-	bne JoyNotLeft
-	cmp.b r8,#0
-	beq JoyNotLeft
-	sub.b r8,r8,#4
-	mov r6, #2
-JoyNotLeft:
-	tst r0,#0b0000000000010000 ; Right
-	bne JoyNotRight
-	cmp.b r8,#240-8
-	beq JoyNotRight
-	add.b r8,r8,#4
-	mov r6, #3
-JoyNotRight:
+    bl RemoveSprite
 
-	bl ShowSprite
+    ; Check directions once per press
+    tst r0,#0b0000000001000000 ; Up
+    bne CheckDown
+    cmp r9,#0
+    beq CheckDown
+    sub r9,r9,#12
+    mov r6, #0
+    b AfterDirectionCheck
 
-	mov r0,#0x1FFF
+CheckDown:
+    tst r0,#0b0000000010000000 ; Down
+    bne CheckLeft
+    cmp r9,#160-8
+    beq CheckLeft
+    add r9,r9,#12
+    mov r6, #1
+    b AfterDirectionCheck
+
+CheckLeft:
+    tst r0,#0b0000000000100000 ; Left
+    bne CheckRight
+    cmp r8,#0
+    beq CheckRight
+    sub r8,r8,#12
+    mov r6, #2
+    b AfterDirectionCheck
+
+CheckRight:
+    tst r0,#0b0000000000010000 ; Right
+    bne AfterDirectionCheck
+    cmp r8,#240-8
+    beq AfterDirectionCheck
+    add r8,r8,#12
+    mov r6, #3
+
+AfterDirectionCheck:
+    bl ShowSprite
+
+    ; Small delay to prevent accidental double presses
+    mov r0,#0x3FFF
 Delay:
-	subs r0,r0,#1
-	bne Delay
-	b InfLoop
+    subs r0,r0,#1
+    bne Delay
+
+    b InfLoop
 
 LoadBackground:
 	STMFD sp!, {r0-r7, lr}
