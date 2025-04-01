@@ -38,8 +38,8 @@ ProgramStart:
 
 	bl LoadBackground
 
-	mov r8,#10
-	mov r9,#10
+	mov r8,#112
+	mov r9,#146
 	mov r6,#0 ; direction: 0=North, 1=South, 2=West, 3=East
 
 	bl ShowSprite
