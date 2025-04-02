@@ -72,7 +72,7 @@ WaitForInput:
 CheckDown:
     tst r0,#0b0000000010000000 ; Down
     bne CheckLeft
-    cmp r9,#160-8
+    cmp r9,#160-16
     beq CheckLeft
     add r9,r9,#12
     mov r6, #1
@@ -90,7 +90,7 @@ CheckLeft:
 CheckRight:
     tst r0,#0b0000000000010000 ; Right
     bne AfterDirectionCheck
-    cmp r8,#240-8
+    cmp r8,#240-16
     beq AfterDirectionCheck
     add r8,r8,#12
     mov r6, #3

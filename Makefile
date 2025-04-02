@@ -4,13 +4,13 @@
 ASM = vasmarm_std
 
 # Input assembly file
-SOURCE = GBA_JoypadComplete.asm
+SOURCE = game.asm
 
 # Output directory
 BUILD_DIR = BldGBA
 
 # Output files
-OUTPUT = $(BUILD_DIR)/program.gba
+OUTPUT = $(BUILD_DIR)/game.gba
 LISTING = $(BUILD_DIR)/Listing.txt
 
 # Build command and flags
