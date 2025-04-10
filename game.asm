@@ -31,80 +31,197 @@
 	.long 0
 
 ProgramStart:
+	mov r0, #0
+	str r0, GameLogicFlag_Ptr	;store in memory that gamelogic didnt happen this frame
+
 	mov sp,#0x03000000
 	mov r4,#0x04000000
 	mov r2,#0x403
 	str r2,[r4]
 
+	; Initialize RAM variables
+    ldr r4, CurrentFrame_Ptr
+    mov r5, #0
+    strb r5, [r4]      ; Initialize CurrentFrame to 0
+
 	bl LoadBackground
 
-	mov r8,#112
+	mov r8,#52
 	mov r9,#146
+	and r8, r8, #0xFF
+	and r9, r9, #0xFF
 	mov r6,#0 ; direction: 0=North, 1=South, 2=West, 3=East
 
 	bl ShowSprite
 
+
+MoveOrGame:
+	ldr r0, GameLogicFlag_Ptr ;get game logic flag, did the game logic already happen this frame
+	ldr r0, [r0]
+	cmp r0, #0				;if the GameLogic is 0, do the gamelogic, set flag at end to 1
+	beq MoveOncePerFrame
+	b InfLoop
+	
+	
+MoveOrGame2:
+	ldr r1, Delay_Ptr	;get move delay from memory
+	ldr r0, [r1]
+	cmp.b r0, #0		;if 0, do move logic again, else decrement and go to MoveOrGame
+	beq InfLoop
+	sub r0,r0,#1			;if not 0, decrement, store, go to MoveOrGame
+	ldr r1, Delay_Ptr
+	str r0, [r1]
+	b MoveOrGame
+	
+MoveOncePerFrame:
+	mov r0, #1
+	ldr r1, GameLogicFlag_Ptr
+	str r0, [r1]		;put gamelogic flag up
+	ldr r0, Vcount_Ptr ;get current vram line rendering
+	ldr r0, [r0]
+	cmp.b r0, #161		;check if in vblank currently rendering
+	bgt GameLogic
+	b MoveOrGame2			;else get to the Move part of MoveOrGame
+	
 InfLoop:
     mov r3, #0x4000130
+
+	
 WaitNoInput:
-    ldrh r0, [r3]
-    and r0, r0, #0b0000000011110000
-    cmp r0, #0b0000000011110000
-    bne WaitNoInput     ; Wait until no buttons pressed
+    ; Load previous input (pressed = 1 logic)
+    ldr r0, PreviousInput_Ptr
+    ldrh r2, [r0]            ; r2 = previous pressed buttons
+
+    ; Load current input
+    ldrh r1, [r3]            ; raw input
+    mvn r1, r1               ; invert → pressed = 1
+    and r1, r1, #0xF0        ; keep only D-pad bits
+
+    ; Store current for next time
+    strh r1, [r0]            ; update PreviousInput
+
+    ; If nothing is newly pressed, go back
+    ; Check: r1 == 0 → no buttons pressed → go to MoveOrGame
+    cmp r1, #0
+    beq MoveOrGame
+
+    ; Check if current input equals previous input → still holding → skip
+    cmp r1, r2
+    beq MoveOrGame
+
+    ; Else → new directional press
+	
+    mov r0, r1               ; pass current input in r0 if needed
+    b DirectionChecks
+
+	
+   ; ldrh r0, [r3]
+    ;and r0, r0, #0b0000000011110000
+    ;cmp r0, #0b0000000011110000
+    ;bne WaitNoInput     ; Wait until no buttons pressed
+    ;bne MoveOrGame  ; Wait until no buttons pressed, else go to MoveOrGame to decide whether to do game logic or come back
+
 
 WaitForInput:
-    ldrh r0, [r3]
+    ldrh r1, [r3]
+	mov r0, r1
     and r0, r0, #0b0000000011110000
     cmp r0, #0b0000000011110000
-    beq WaitForInput    ; Wait until a direction is pressed
+    ;beq WaitForInput    ; Wait until a direction is pressed
+	beq MoveOrGame		;same ol same ol
 
+DirectionChecks:
+	
     bl RemoveSprite
 
+	ldrh r1, [r3]
+	mov r0, r1
+    and r0, r0, #0b0000000011110000
+	
     ; Check directions once per press
     tst r0,#0b0000000001000000 ; Up
     bne CheckDown
-    cmp r9,#0
-    beq CheckDown
-    sub r9,r9,#12
-    mov r6, #0
+    cmp.b r9,#4
+    blt CheckDown
+    sub.b r9,r9,#12
+    mov r6, #0          ; North
+
     b AfterDirectionCheck
 
 CheckDown:
     tst r0,#0b0000000010000000 ; Down
     bne CheckLeft
-    cmp r9,#160-16
-    beq CheckLeft
-    add r9,r9,#12
-    mov r6, #1
+    cmp.b r9,#140
+    bgt CheckLeft
+    add.b r9,r9,#12
+    mov r6, #1          ; South
     b AfterDirectionCheck
 
 CheckLeft:
     tst r0,#0b0000000000100000 ; Left
     bne CheckRight
-    cmp r8,#0
-    beq CheckRight
-    sub r8,r8,#12
-    mov r6, #2
+	cmp.b r8,#0
+	blt Death
+    cmp.b r8,#6
+    blt CheckRight
+    sub.b r8,r8,#10
+    mov r6, #2          ; West
     b AfterDirectionCheck
 
 CheckRight:
     tst r0,#0b0000000000010000 ; Right
     bne AfterDirectionCheck
-    cmp r8,#240-16
-    beq AfterDirectionCheck
-    add r8,r8,#12
-    mov r6, #3
+	cmp.b r8,#136
+	bgt Death
+    cmp.b r8,#126
+    bgt AfterDirectionCheck
+    add.b r8,r8,#10
+    mov r6, #3          ; East
 
 AfterDirectionCheck:
-    bl ShowSprite
+    ; Remove old sprite first
+    bl RemoveSprite
 
-    ; Small delay to prevent accidental double presses
-    mov r0,#0x3FFF
-Delay:
+    ; Set jump frame for movement
+    ldr r4, CurrentFrame_Ptr
+    mov r7, #1
+    strb r7, [r4]
+    bl ShowSprite       ; This will use current r6 value for direction
+
+    ; Small delay for jump frame
+    mov r0,#0x5FFF
+Delay1:
     subs r0,r0,#1
-    bne Delay
+    bne Delay1
+
+JumpAnimation:
+    ; Remove jump frame sprite
+    bl RemoveSprite
+
+    ; Reset to normal frame
+    ldr r4, CurrentFrame_Ptr
+    mov r7, #0
+    strb r7, [r4]
+    bl ShowSprite       ; This will use current r6 value for direction
+
+    ; Delay before next input
+    mov r0,#0x2AFF
+Delay2:
+    subs r0,r0,#1
+    bne Delay2
 
     b InfLoop
+	
+GameLogic:
+	mov r0, #0
+	ldr r1, MoveOncePerFrame	;store gamelogicflag as down
+	str r0, [r1]
+	b MoveOrGame
+	
+Death:
+	mov r8, #60
+	mov r9, #60
+	b InfLoop
 
 LoadBackground:
 	STMFD sp!, {r0-r7, lr}
@@ -127,91 +244,163 @@ ShowSprite:
 	mul r2,r1,r9
 	add r10,r10,r2
 
-	cmp r6, #0
-	beq LoadNorth
-	cmp r6, #1
-	beq LoadSouth
-	cmp r6, #2
-	beq LoadWest
-	cmp r6, #3
-	beq LoadEast
+	; Load current animation frame
+    ldr r4, CurrentFrame_Ptr
+    ldrb r5, [r4]       ; r5 now contains current frame (0 or 1)
+
+    cmp r6, #0          ; Check if facing North
+    bne CheckSouth
+    cmp r5, #0          ; Check which frame
+    bne NorthJump
+    adr r4, sprite_literals
+    ldr r7, [r4, #0]    ; Load normal sprite
+    ldr r1, [r7]
+    b AfterLoadFrog
+
+NorthJump:
+	adr r4, sprite_literals
+	ldr r7, [r4, #4]
+	ldr r1, [r7]        ; Two-step load for Frame 1
 	b AfterLoadFrog
 
-LoadNorth:
-	ldr r1, FrogNorth_Literal
+CheckSouth:
+	cmp r6, #1          ; Check if facing South
+	bne CheckWest
+	cmp r5, #0          ; Check which frame
+	bne SouthJump
+	adr r4, sprite_literals
+	ldr r7, [r4, #8]
+	ldr r1, [r7]
 	b AfterLoadFrog
-LoadSouth:
-	ldr r1, FrogSouth_Literal
+
+SouthJump:
+	adr r4, sprite_literals
+	ldr r7, [r4, #12]
+	ldr r1, [r7]        ; Two-step load for Frame 1
 	b AfterLoadFrog
-LoadWest:
-	ldr r1, FrogWest_Literal
+
+CheckWest:
+	cmp r6, #2          ; Check if facing West
+	bne CheckEast
+	cmp r5, #0          ; Check which frame
+   	bne WestJump
+	adr r4, sprite_literals
+	ldr r7, [r4, #16]
+	ldr r1, [r7]
 	b AfterLoadFrog
-LoadEast:
-	ldr r1, FrogEast_Literal
+
+WestJump:
+	adr r4, sprite_literals
+	ldr r7, [r4, #20]
+	ldr r1, [r7]
+	b AfterLoadFrog
+
+CheckEast:
+	cmp r5, #0          
+   	bne EastJump
+	adr r4, sprite_literals
+	ldr r7, [r4, #24]
+	ldr r1, [r7]
+	b AfterLoadFrog
+
+EastJump:
+	adr r4, sprite_literals
+	ldr r7, [r4, #28]
+	ldr r1, [r7]
 
 AfterLoadFrog:
-	mov r6,#16
+
+.align 4
+sprite_literals:
+    .long FrogNorth_Literal
+    .long FrogNorthJump_Literal
+    .long FrogSouth_Literal
+    .long FrogSouthJump_Literal
+    .long FrogWest_Literal
+    .long FrogWestJump_Literal
+    .long FrogEast_Literal
+    .long FrogEastJump_Literal
+
+	mov r4,#16          ; Changed from r6 to r4
 Sprite_NextLine:
-	mov r5,#16
-	STMFD sp!,{r10}
+    mov r5,#16
+    STMFD sp!,{r10}
 Sprite_NextByte:
-	ldrH r3,[r1],#2
-	cmp r3,#0
-	beq Sprite_SkipPixel
-	strH r3,[r10]
+    ldrH r3,[r1],#2
+    cmp r3,#0
+    beq Sprite_SkipPixel
+    strH r3,[r10]
 Sprite_SkipPixel:
-	add r10,r10,#2
-	subs r5,r5,#1
-	bne Sprite_NextByte
-	LDMFD sp!,{r10}
-	add r10,r10,#240*2
-	subs r6,r6,#1
-	bne Sprite_NextLine
-	mov pc,lr
+    add r10,r10,#2
+    subs r5,r5,#1
+    bne Sprite_NextByte
+    LDMFD sp!,{r10}
+    add r10,r10,#240*2
+    subs r4,r4,#1      ; Changed from r6 to r4
+    bne Sprite_NextLine
+    mov pc,lr
 
 RemoveSprite:
-	STMFD sp!, {r0-r7, lr}
-	mov r10,#0x06000000
-	mov r1,#2
-	mul r2,r1,r8
-	add r10,r10,r2
-	mov r1,#240*2
-	mul r2,r1,r9
-	add r10,r10,r2
-	ldr r0, BackgroundData_Ptr
-	mov r1, r9
-	mov r2, #240
-	mul r3, r1, r2
-	add r3, r3, r8
-	mov r2, #2
-	mul r3, r2, r3
-	add r0, r0, r3
-	mov r6, #16
+    STMFD sp!, {r0-r7, lr}
+    mov r10,#0x06000000
+    mov r1,#2
+    mul r2,r1,r8
+    add r10,r10,r2
+    mov r1,#240*2
+    mul r2,r1,r9
+    add r10,r10,r2
+    ldr r0, BackgroundData_Ptr
+    mov r1, r9
+    mov r2, #240
+    mul r3, r1, r2
+    add r3, r3, r8
+    mov r2, #2
+    mul r3, r2, r3
+    add r0, r0, r3
+    mov r4, #16        ; Changed from r6 to r4 for the counter
 RemoveSprite_NextLine:
-	mov r5, #16
-	STMFD sp!,{r10, r0}
+    mov r5, #16
+    STMFD sp!,{r10, r0}
 RemoveSprite_NextByte:
-	ldrH r3,[r0],#2
-	strH r3,[r10],#2
-	subs r5,r5,#1
-	bne RemoveSprite_NextByte
-	LDMFD sp!,{r10, r0}
-	add r10,r10,#240*2
-	add r0, r0, #240*2
-	subs r6,r6,#1
-	bne RemoveSprite_NextLine
-	LDMFD sp!, {r0-r7, pc}
+    ldrH r3,[r0],#2
+    strH r3,[r10],#2
+    subs r5,r5,#1
+    bne RemoveSprite_NextByte
+    LDMFD sp!,{r10, r0}
+    add r10,r10,#240*2
+    add r0, r0, #240*2
+    subs r4,r4,#1      ; Changed from r6 to r4
+    bne RemoveSprite_NextLine
+    LDMFD sp!, {r0-r7, pc}
 
 BackgroundData_Ptr: .long BackgroundData
 
+CurrentFrame_Ptr:   .long 0x03000000
+;AnimDelay_Ptr:      .long 0x03000001
+Delay_Ptr:			.long 0x03005C00
+GameLogicFlag_Ptr:	.long 0x03000003
+Vcount_Ptr:			.long 0x04000006
+PreviousInput_Ptr: 	.long 0x03007F00
+
+ 
 FrogNorth_Data: .incbin "assets/frogs/frogNorth.img.bin"
 FrogSouth_Data: .incbin "assets/frogs/frogSouth.img.bin"
 FrogEast_Data:  .incbin "assets/frogs/frogEast.img.bin"
 FrogWest_Data:  .incbin "assets/frogs/frogWest.img.bin"
+
+FrogNorthJump_Data:  .incbin "assets/frogs/frogNorthJump.img.bin"  ; Jump frame for north
+FrogSouthJump_Data:  .incbin "assets/frogs/frogSouthJump.img.bin"  ; Jump frame for south
+FrogEastJump_Data:   .incbin "assets/frogs/frogEastJump.img.bin"   ; Jump frame for east
+FrogWestJump_Data:   .incbin "assets/frogs/frogWestJump.img.bin"   ; Jump frame for west
 
 FrogNorth_Literal: .long FrogNorth_Data
 FrogSouth_Literal: .long FrogSouth_Data
 FrogWest_Literal:  .long FrogWest_Data
 FrogEast_Literal:  .long FrogEast_Data
 
-BackgroundData: .incbin "assets/background.img.bin"
+FrogNorthJump_Literal: .long FrogNorthJump_Data
+FrogSouthJump_Literal: .long FrogSouthJump_Data
+FrogEastJump_Literal:  .long FrogEastJump_Data
+FrogWestJump_Literal:  .long FrogWestJump_Data
+
+BackgroundData: .incbin "assets/smallmap.img.bin"
