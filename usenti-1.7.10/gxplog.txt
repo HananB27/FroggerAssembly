@@ -1,14 +1,14 @@
 STATUS: Validatating gr.
 WARNING:   No explicit src path.
 STATUS: Validation succeeded.
-STATUS: Started run at: 2025-04-01, 18:57:22
+STATUS: Started run at: 2025-04-10, 22:48:48
 STATUS: Validatating gr.
 STATUS: Validation succeeded.
 STATUS: Preparing data.
 STATUS: Work-DIB creation.
 WARNING:   converting from 8 bpp to 16 bpp.
 STATUS: converting to: 16bpp, BGR.
-STATUS: Work-DIB creation complete: 240x160@16.
+STATUS: Work-DIB creation complete: 16x16@16.
 STATUS: Tile preparation.
 STATUS: Tile preparation complete.
 STATUS: Graphics preparation.

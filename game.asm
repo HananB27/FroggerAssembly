@@ -45,6 +45,7 @@ ProgramStart:
     strb r5, [r4]      ; Initialize CurrentFrame to 0
 
 	bl LoadBackground
+    b ShowMenu
 
 	mov r8,#52
 	mov r9,#146
@@ -54,6 +55,133 @@ ProgramStart:
 
 	bl ShowSprite
 
+ShowMenu:
+    ; Draw "FROGGER" letters
+    bl DrawTitle
+    
+    ; Check for Start button (Enter)
+CheckStart:
+    ldrh r0, [r3]
+    mvn r0, r0               ; Invert the input (like in your WaitNoInput)
+    and r0, r0, #0x08            ; Check Start button (bit 3)
+    cmp r0, #0x08
+    bne CheckStart           ; If not pressed, keep checking
+
+    b GameInit         ; Jump to your existing game code
+
+DrawTitle:
+    STMFD sp!, {r0-r7, lr}
+
+    ; Draw F
+    mov r8, #64        ; X position for F (adjusted for 7 letters)
+    mov r9, #60        ; Y position for letters
+    ldr r4, title_literals
+    ldr r7, [r4, #0]
+    ldr r1, [r7]
+    bl DrawLetter
+
+    ; Draw R
+    mov r8, #80        ; X position for R
+    ldr r4, title_literals
+    ldr r7, [r4, #4]
+    ldr r1, [r4]
+    bl DrawLetter
+
+    ; Draw O
+    mov r8, #96        ; X position for O
+    ldr r4, sprite_literals
+    ldr r7, [r4, #12]
+    ldr r1, [r7]
+    bl DrawLetter
+
+    ; Draw G
+    mov r8, #112       ; X position for first G
+    ldr r4, sprite_literals
+    ldr r7, [r4, #16]
+    ldr r1, [r7]
+    bl DrawLetter
+
+    ; Draw G (second)
+    mov r8, #128       ; X position for second G
+    ldr r4, sprite_literals
+    ldr r7, [r4, #16]
+    ldr r1, [r7]
+    bl DrawLetter
+
+    ; Draw E
+    mov r8, #144       ; X position for E
+    ldr r4, sprite_literals
+    ldr r7, [r4, #20]
+    ldr r1, [r7]
+    bl DrawLetter
+
+    ; Draw R (second)
+    mov r8, #160       ; X position for final R
+    ldr r4, sprite_literals
+    ldr r7, [r4, #4]
+    ldr r1, [r7]
+    bl DrawLetter
+
+    LDMFD sp!, {r0-r7, pc}
+
+.align 4
+title_literals:
+    .long F_Literal
+    .long R_Literal
+    .long O_Literal
+    .long G_Literal
+    .long E_Literal
+
+DrawLetter:
+    STMFD sp!, {r0-r7, lr}
+    
+    mov r10,#0x06000000
+    mov r1,#2
+    mul r2,r1,r8
+    add r10,r10,r2
+    mov r1,#240*2
+    mul r2,r1,r9
+    add r10,r10,r2
+
+    ; r1 already contains the letter sprite data
+    mov r4,#16          ; Height
+DrawLetter_NextLine:
+    mov r5,#16          ; Width
+    STMFD sp!,{r10}
+DrawLetter_NextByte:
+    ldrH r3,[r1],#2
+    cmp r3,#0
+    beq DrawLetter_SkipPixel
+    strH r3,[r10]
+DrawLetter_SkipPixel:
+    add r10,r10,#2
+    subs r5,r5,#1
+    bne DrawLetter_NextByte
+    LDMFD sp!,{r10}
+    add r10,r10,#240*2
+    subs r4,r4,#1
+    bne DrawLetter_NextLine
+    
+    LDMFD sp!, {r0-r7, pc}
+
+GameInit:
+    mov r0, #0
+    str r0, GameLogicFlag_Ptr    ; store in memory that gamelogic didnt happen this frame
+
+    ; Initialize RAM variables
+    ldr r4, CurrentFrame_Ptr
+    mov r5, #0
+    strb r5, [r4]      ; Initialize CurrentFrame to 0
+
+    mov r8,#52
+    mov r9,#146
+    and r8, r8, #0xFF
+    and r9, r9, #0xFF
+    mov r6,#0          ; direction: 0=North, 1=South, 2=West, 3=East
+
+    bl ShowSprite
+
+    b MoveOrGame 
 
 MoveOrGame:
 	ldr r0, GameLogicFlag_Ptr ;get game logic flag, did the game logic already happen this frame
@@ -395,6 +523,12 @@ FrogSouthJump_Data:  .incbin "assets/frogs/frogSouthJump.img.bin"  ; Jump frame 
 FrogEastJump_Data:   .incbin "assets/frogs/frogEastJump.img.bin"   ; Jump frame for east
 FrogWestJump_Data:   .incbin "assets/frogs/frogWestJump.img.bin"   ; Jump frame for west
 
+F_Data:  .incbin "assets/letters/title/F.img.bin"
+R_Data:  .incbin "assets/letters/title/R.img.bin"
+O_Data:  .incbin "assets/letters/title/O.img.bin"
+G_Data:  .incbin "assets/letters/title/G.img.bin"
+E_Data:  .incbin "assets/letters/title/E.img.bin"
+
 FrogNorth_Literal: .long FrogNorth_Data
 FrogSouth_Literal: .long FrogSouth_Data
 FrogWest_Literal:  .long FrogWest_Data
@@ -404,5 +538,11 @@ FrogNorthJump_Literal: .long FrogNorthJump_Data
 FrogSouthJump_Literal: .long FrogSouthJump_Data
 FrogEastJump_Literal:  .long FrogEastJump_Data
 FrogWestJump_Literal:  .long FrogWestJump_Data
+
+F_Literal: .long F_Data
+R_Literal: .long R_Data
+O_Literal: .long O_Data
+G_Literal: .long G_Data
+E_Literal: .long E_Data
 
 BackgroundData: .incbin "assets/smallmap.img.bin"
