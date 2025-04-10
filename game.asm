@@ -60,8 +60,19 @@ MoveOrGame:
 	ldr r0, [r0]
 	cmp r0, #0				;if the GameLogic is 0, do the gamelogic, set flag at end to 1
 	beq MoveOncePerFrame
-	b InfLoop
+	b MoveOrGame2
 	
+	
+
+MoveOncePerFrame:
+	mov r0, #1
+	ldr r1, GameLogicFlag_Ptr
+	str r0, [r1]		;put gamelogic flag up
+	ldr r0, Vcount_Ptr ;get current vram line rendering
+	ldr r0, [r0]
+	cmp.b r0, #161		;check if in vblank currently rendering
+	bgt GameLogic
+	b MoveOrGame2			;else get to the Move part of MoveOrGame
 	
 MoveOrGame2:
 	ldr r1, Delay_Ptr	;get move delay from memory
@@ -73,15 +84,6 @@ MoveOrGame2:
 	str r0, [r1]
 	b MoveOrGame
 	
-MoveOncePerFrame:
-	mov r0, #1
-	ldr r1, GameLogicFlag_Ptr
-	str r0, [r1]		;put gamelogic flag up
-	ldr r0, Vcount_Ptr ;get current vram line rendering
-	ldr r0, [r0]
-	cmp.b r0, #161		;check if in vblank currently rendering
-	bgt GameLogic
-	b MoveOrGame2			;else get to the Move part of MoveOrGame
 	
 InfLoop:
     mov r3, #0x4000130
@@ -113,7 +115,6 @@ WaitNoInput:
 	
     mov r0, r1               ; pass current input in r0 if needed
     b DirectionChecks
-
 	
    ; ldrh r0, [r3]
     ;and r0, r0, #0b0000000011110000
@@ -160,8 +161,6 @@ CheckDown:
 CheckLeft:
     tst r0,#0b0000000000100000 ; Left
     bne CheckRight
-	cmp.b r8,#0
-	blt Death
     cmp.b r8,#6
     blt CheckRight
     sub.b r8,r8,#10
@@ -171,8 +170,6 @@ CheckLeft:
 CheckRight:
     tst r0,#0b0000000000010000 ; Right
     bne AfterDirectionCheck
-	cmp.b r8,#136
-	bgt Death
     cmp.b r8,#126
     bgt AfterDirectionCheck
     add.b r8,r8,#10
@@ -205,19 +202,24 @@ JumpAnimation:
     bl ShowSprite       ; This will use current r6 value for direction
 
     ; Delay before next input
-    mov r0,#0x2AFF
-Delay2:
-    subs r0,r0,#1
-    bne Delay2
+    mov r0,#0x1AFF
+	ldr r1, Delay_Ptr
+	str r0, [r1]
+	b MoveOrGame
 
-    b InfLoop
-	
 GameLogic:
 	mov r0, #0
 	ldr r1, MoveOncePerFrame	;store gamelogicflag as down
 	str r0, [r1]
+	cmp.b r8,#136
+	bgt OutOfBoundDeath
+	cmp.b r8,#0
+	blt Death
 	b MoveOrGame
 	
+	
+OutOfBoundDeath:
+
 Death:
 	mov r8, #60
 	mov r9, #60
