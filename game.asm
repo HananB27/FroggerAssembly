@@ -31,6 +31,9 @@
 	.long 0
 
 ProgramStart:
+	mov r0, #0
+	str r0, GameLogicFlag_Ptr	;store in memory that gamelogic didnt happen this frame
+
 	mov sp,#0x03000000
 	mov r4,#0x04000000
 	mov r2,#0x403
@@ -43,34 +46,104 @@ ProgramStart:
 
 	bl LoadBackground
 
-	mov r8,#112
+	mov r8,#52
 	mov r9,#146
+	and r8, r8, #0xFF
+	and r9, r9, #0xFF
 	mov r6,#0 ; direction: 0=North, 1=South, 2=West, 3=East
 
 	bl ShowSprite
 
+
+MoveOrGame:
+	ldr r0, GameLogicFlag_Ptr ;get game logic flag, did the game logic already happen this frame
+	ldr r0, [r0]
+	cmp r0, #0				;if the GameLogic is 0, do the gamelogic, set flag at end to 1
+	beq MoveOncePerFrame
+	b InfLoop
+	
+	
+MoveOrGame2:
+	ldr r1, Delay_Ptr	;get move delay from memory
+	ldr r0, [r1]
+	cmp.b r0, #0		;if 0, do move logic again, else decrement and go to MoveOrGame
+	beq InfLoop
+	sub r0,r0,#1			;if not 0, decrement, store, go to MoveOrGame
+	ldr r1, Delay_Ptr
+	str r0, [r1]
+	b MoveOrGame
+	
+MoveOncePerFrame:
+	mov r0, #1
+	ldr r1, GameLogicFlag_Ptr
+	str r0, [r1]		;put gamelogic flag up
+	ldr r0, Vcount_Ptr ;get current vram line rendering
+	ldr r0, [r0]
+	cmp.b r0, #161		;check if in vblank currently rendering
+	bgt GameLogic
+	b MoveOrGame2			;else get to the Move part of MoveOrGame
+	
 InfLoop:
     mov r3, #0x4000130
+
+	
 WaitNoInput:
-    ldrh r0, [r3]
-    and r0, r0, #0b0000000011110000
-    cmp r0, #0b0000000011110000
-    bne WaitNoInput     ; Wait until no buttons pressed
+    ; Load previous input (pressed = 1 logic)
+    ldr r0, PreviousInput_Ptr
+    ldrh r2, [r0]            ; r2 = previous pressed buttons
+
+    ; Load current input
+    ldrh r1, [r3]            ; raw input
+    mvn r1, r1               ; invert → pressed = 1
+    and r1, r1, #0xF0        ; keep only D-pad bits
+
+    ; Store current for next time
+    strh r1, [r0]            ; update PreviousInput
+
+    ; If nothing is newly pressed, go back
+    ; Check: r1 == 0 → no buttons pressed → go to MoveOrGame
+    cmp r1, #0
+    beq MoveOrGame
+
+    ; Check if current input equals previous input → still holding → skip
+    cmp r1, r2
+    beq MoveOrGame
+
+    ; Else → new directional press
+	
+    mov r0, r1               ; pass current input in r0 if needed
+    b DirectionChecks
+
+	
+   ; ldrh r0, [r3]
+    ;and r0, r0, #0b0000000011110000
+    ;cmp r0, #0b0000000011110000
+    ;bne WaitNoInput     ; Wait until no buttons pressed
+    ;bne MoveOrGame  ; Wait until no buttons pressed, else go to MoveOrGame to decide whether to do game logic or come back
+
 
 WaitForInput:
-    ldrh r0, [r3]
+    ldrh r1, [r3]
+	mov r0, r1
     and r0, r0, #0b0000000011110000
     cmp r0, #0b0000000011110000
-    beq WaitForInput    ; Wait until a direction is pressed
+    ;beq WaitForInput    ; Wait until a direction is pressed
+	beq MoveOrGame		;same ol same ol
 
+DirectionChecks:
+	
     bl RemoveSprite
 
+	ldrh r1, [r3]
+	mov r0, r1
+    and r0, r0, #0b0000000011110000
+	
     ; Check directions once per press
     tst r0,#0b0000000001000000 ; Up
     bne CheckDown
-    cmp r9,#0
-    beq CheckDown
-    sub r9,r9,#12
+    cmp.b r9,#4
+    blt CheckDown
+    sub.b r9,r9,#12
     mov r6, #0          ; North
 
     b AfterDirectionCheck
@@ -78,27 +151,31 @@ WaitForInput:
 CheckDown:
     tst r0,#0b0000000010000000 ; Down
     bne CheckLeft
-    cmp r9,#160-16
-    beq CheckLeft
-    add r9,r9,#12
+    cmp.b r9,#140
+    bgt CheckLeft
+    add.b r9,r9,#12
     mov r6, #1          ; South
     b AfterDirectionCheck
 
 CheckLeft:
     tst r0,#0b0000000000100000 ; Left
     bne CheckRight
-    cmp r8,#0
-    beq CheckRight
-    sub r8,r8,#12
+	cmp.b r8,#0
+	blt Death
+    cmp.b r8,#6
+    blt CheckRight
+    sub.b r8,r8,#10
     mov r6, #2          ; West
     b AfterDirectionCheck
 
 CheckRight:
     tst r0,#0b0000000000010000 ; Right
     bne AfterDirectionCheck
-    cmp r8,#240-16
-    beq AfterDirectionCheck
-    add r8,r8,#12
+	cmp.b r8,#136
+	bgt Death
+    cmp.b r8,#126
+    bgt AfterDirectionCheck
+    add.b r8,r8,#10
     mov r6, #3          ; East
 
 AfterDirectionCheck:
@@ -112,11 +189,12 @@ AfterDirectionCheck:
     bl ShowSprite       ; This will use current r6 value for direction
 
     ; Small delay for jump frame
-    mov r0,#0x7FFF
+    mov r0,#0x5FFF
 Delay1:
     subs r0,r0,#1
     bne Delay1
 
+JumpAnimation:
     ; Remove jump frame sprite
     bl RemoveSprite
 
@@ -127,12 +205,23 @@ Delay1:
     bl ShowSprite       ; This will use current r6 value for direction
 
     ; Delay before next input
-    mov r0,#0xFFFF
+    mov r0,#0x2AFF
 Delay2:
     subs r0,r0,#1
     bne Delay2
 
     b InfLoop
+	
+GameLogic:
+	mov r0, #0
+	ldr r1, MoveOncePerFrame	;store gamelogicflag as down
+	str r0, [r1]
+	b MoveOrGame
+	
+Death:
+	mov r8, #60
+	mov r9, #60
+	b InfLoop
 
 LoadBackground:
 	STMFD sp!, {r0-r7, lr}
@@ -288,7 +377,12 @@ BackgroundData_Ptr: .long BackgroundData
 
 CurrentFrame_Ptr:   .long 0x03000000
 ;AnimDelay_Ptr:      .long 0x03000001
+Delay_Ptr:			.long 0x03005C00
+GameLogicFlag_Ptr:	.long 0x03000003
+Vcount_Ptr:			.long 0x04000006
+PreviousInput_Ptr: 	.long 0x03007F00
 
+ 
 FrogNorth_Data: .incbin "assets/frogs/frogNorth.img.bin"
 FrogSouth_Data: .incbin "assets/frogs/frogSouth.img.bin"
 FrogEast_Data:  .incbin "assets/frogs/frogEast.img.bin"
@@ -309,4 +403,4 @@ FrogSouthJump_Literal: .long FrogSouthJump_Data
 FrogEastJump_Literal:  .long FrogEastJump_Data
 FrogWestJump_Literal:  .long FrogWestJump_Data
 
-BackgroundData: .incbin "assets/background.img.bin" 
+BackgroundData: .incbin "assets/smallmap.img.bin"
