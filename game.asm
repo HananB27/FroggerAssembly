@@ -31,7 +31,6 @@
 	.long 0
 
 ProgramStart:
-	mov r11, #20				;GameTick register
 
 	mov r0, #0
 	ldr r1, GameLogicFlag_Ptr
@@ -50,8 +49,7 @@ ProgramStart:
 
 	bl LoadBackground
 
-	mov r8,#40
-	mov r9,#40
+	
 	
 	mov r8,#52
 	mov r9,#146
@@ -62,15 +60,17 @@ ProgramStart:
 	bl ShowSprite
 	
 	
-	mov r4, #122			;frog 1 vertical pos
+	mov r4, #132			;frog 1 vertical pos
 	
-	mov r0, #0
-	mov r3,#0
+	mov r0, #-15
+	mov r3,#-15
 	bl ShowSpriteXor
-	mov r0, #0
+	mov r0, #-15
 	ldr r1, FirstObjectPosition
-	mov r3,r0,lsl #8
+	mov r3,r0, asl #8
 	str r3,[r1]
+	mov r3, #-15+70
+	bl ShowSpriteXor
 
 
 
@@ -232,26 +232,67 @@ GameLogic:
 	ldr r0, GameLogicFlag_Ptr
 	str r1, [r0]		;Set GameLogicFlag_Ptr as down, do not tick again until out of vblank
 	
-	mov r4, #122			;frog 1 vertical pos
+	mov r4, #132			;frog 1 vertical pos
 	
 	ldr r0, FirstObjectPosition
 	ldr r1,[r0]		
 	mov r3, r1, asr #8
-	;bl ShowSpriteXor			;derender sprite
+	bl ShowSpriteXor			;derender sprite1
+	
 	ldr r0, FirstObjectPosition
 	ldr r1,[r0]		
-	add r1,r1, #1
-	mov r3, r1, asr #8
+	mov r3, r1, asr #8			;get pixel
+	add r3,r3,#70				
 	cmp r3,#150
+	blt DontWrapValue
+	sub r3,r3,#166
+DontWrapValue:
+	
+	bl ShowSpriteXor			;derender sprite2
+	
+	ldr r0, FirstObjectPosition
+	ldr r1,[r0]		
+	add r1,r1, #60				;add subpixel
+	mov r3, r1, asr #8			;get pixel
+	
+	cmp r3,#150					;wrap around
 	blt KeepValue
-	mov r3,#0
+	;mov r3,#-15
+	sub r3,r3,#166
 	mov r1, r3
 KeepValue:
 	str r1,[r0]
-	bl ShowSpriteXor			;render car
+	bl ShowSpriteXor			;render sprite1
+	ldr r0, FirstObjectPosition
+	ldr r1,[r0]		
+	mov r3, r1, asr #8			;get pixel
+	add r3,r3,#70
+	cmp r3,#150
+	blt DontWrapValue2
+	sub r3,r3,#166
+DontWrapValue2:
+	bl ShowSpriteXor			;render sprite 2
+	
+	;cmp r8, #
+	;Lane1Collision
 	
 	b InfLoop
 	
+	
+CheckIfCollided:
+	cmp r0,r8
+	bgt HesOk
+	sub r0,r0,#16
+	cmp r0,r8
+	bgt Death
+HesOk:
+
+Lane1Collision:
+	ldr r0, FirstObjectPosition
+	ldr r0,[r0]
+	bl CheckIfCollided
+	add r0,r0, #70
+	bl CheckIfCollided
 	
 OutOfBoundDeath:
 	bl RemoveSprite
@@ -260,8 +301,10 @@ OutOfBoundDeath:
 	b Death
 	
 Death:
-	
-	b MoveOrGame
+	bl RemoveSprite
+	mov r8, #170
+	mov r9, #70
+	b Death
 
 MoveBack:
 	mov r8,#20
@@ -436,7 +479,7 @@ ShowSpriteXor:
     mul   r2, r1, r4          ; r2 = y coordinate * 480
     add   r10, r10, r2        ; add Y offset
 
-    ; Load car sprite address from CarFirst_Literal
+    ; Load car sprite address from CarThird_Literal
     adr   r2, CarThird_Literal
     ldr   r1, [r2]            ; r1 now holds address of car sprite data
 
@@ -449,10 +492,10 @@ Sprite_NextLineXor:
 
 Sprite_NextByteXor:
     add   r2, r11, r7         ; Compute absolute x: starting x (r11) + current column (r7)
-    cmp   r2, #148            ; if absolute x > 148, skip drawing this pixel
-    bgt   SkipPixelXor
-	;cmp r2, #0
-	;blt		SkipPixelXor
+    cmp   r2, #0              ; Check if absolute x is negative
+    blt   SkipPixelXor        ; If negative, skip drawing this pixel
+    cmp   r2, #148            ; Check if absolute x is above 148
+    bgt   SkipPixelXor        ; If so, skip drawing this pixel
     ldrH  r3, [r1], #2        ; load one halfword (pixel) from car sprite data; advance pointer
     ldrH  r2, [r10]           ; load current VRAM pixel value at destination
     eor   r3, r3, r2          ; XOR the sprite pixel with the background pixel
@@ -475,9 +518,8 @@ ContinuePixelXor:
 
     bx    lr
 
-
-CarThird_Literal:	.long CarThird_Data				;cars
-CarThird_Data:		.incbin "assets/cars/car_small3.img.bin"
+CarThird_Literal: .long CarThird_Data      ; cars
+CarThird_Data:    .incbin "assets/cars/car_small3.img.bin"
 
 
 ;CAR RENDER 16x16 END ---------------------
