@@ -435,10 +435,91 @@ NoCollision22:
 	bne SkipVictoryCheck
 		
 SkipVictoryCheck:
-	
+	; Check if frog has reached the top row where victory zones are
+	cmp r9, #6
+	bne SkipVictoryLogic  ; Not at top, continue normal game
+
+	; We're at the top row (y=6), check if in a valid victory zone
+	; Victory zones: 12px wide, starting at x=0 (shifted 5px left), with 20px gaps
+	; Zone 1: 0-11  (was 5-16)
+	; Zone 2: 32-43 (was 37-48)
+	; Zone 3: 64-75 (was 69-80)
+	; Zone 4: 96-107 (was 101-112)
+	; Zone 5: 128-139 (was 133-144)
+
+	; Check if in zone 1
+	cmp r8, #0
+	blt TopRowButNotInZone  ; Less than start of zone 1
+	cmp r8, #11
+	ble HandleVictory       ; In zone 1
+
+	; Check if in zone 2
+	cmp r8, #32
+	blt TopRowButNotInZone  ; Between zones
+	cmp r8, #43
+	ble HandleVictory       ; In zone 2
+
+	; Check if in zone 3
+	cmp r8, #64
+	blt TopRowButNotInZone  ; Between zones
+	cmp r8, #75
+	ble HandleVictory       ; In zone 3
+
+	; Check if in zone 4
+	cmp r8, #96
+	blt TopRowButNotInZone  ; Between zones
+	cmp r8, #107
+	ble HandleVictory       ; In zone 4
+
+	; Check if in zone 5
+	cmp r8, #128
+	blt TopRowButNotInZone  ; Between zones
+	cmp r8, #139
+	ble HandleVictory       ; In zone 5
+
+	; If we're here, we're at top row but not in a victory zone
+
+
+SkipVictoryLogic:
+	; Continue with normal game logic
 	b InfLoop
-	
-	
+
+; Handle the victory sequence
+HandleVictory:
+    STMFD sp!, {r0-r7, lr}
+
+    ; First show the frog in the victory position
+    bl ShowSprite
+
+    ; Victory celebration delay - Fixed for large immediate value
+    mov r0, #0xF000     ; Use a smaller value that fits in immediate
+    mov r1, #3          ; Multiply by using a loop
+VictoryDelayOuter:
+    mov r2, r0
+VictoryDelayInner:
+    subs r2, r2, #1
+    bne VictoryDelayInner
+    subs r1, r1, #1
+    bne VictoryDelayOuter
+
+    ; Remove sprite from victory position
+    bl RemoveSprite
+
+    ; Teleport player back to starting position
+    mov r8, #52
+    mov r9, #146
+    and r8, r8, #0xFF
+    and r9, r9, #0xFF
+    mov r6, #0    ; Face north
+
+    ; Show sprite at starting position
+    bl ShowSprite
+
+    LDMFD sp!, {r0-r7, pc}
+
+TopRowButNotInZone:
+	; Player is at the top but not in a victory zone - death!
+	b Death
 OutOfBoundDeath:
 	bl RemoveSprite
 	mov r8, #50
