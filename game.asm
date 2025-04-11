@@ -31,13 +31,17 @@
 	.long 0
 
 ProgramStart:
+	mov r11, #20				;GameTick register
+
 	mov r0, #0
-	str r0, GameLogicFlag_Ptr	;store in memory that gamelogic didnt happen this frame
+	ldr r1, GameLogicFlag_Ptr
+	str r0, [r1]	;store in memory that gamelogic didnt happen this frame
 
 	mov sp,#0x03000000
 	mov r4,#0x04000000
 	mov r2,#0x403
 	str r2,[r4]
+
 
 	; Initialize RAM variables
     ldr r4, CurrentFrame_Ptr
@@ -46,6 +50,9 @@ ProgramStart:
 
 	bl LoadBackground
 
+	mov r8,#40
+	mov r9,#40
+	
 	mov r8,#52
 	mov r9,#146
 	and r8, r8, #0xFF
@@ -53,26 +60,44 @@ ProgramStart:
 	mov r6,#0 ; direction: 0=North, 1=South, 2=West, 3=East
 
 	bl ShowSprite
+	
+	
+	mov r4, #122			;frog 1 vertical pos
+	
+	mov r0, #0
+	mov r3,#0
+	bl ShowSpriteXor
+	mov r0, #0
+	ldr r1, FirstObjectPosition
+	mov r3,r0,lsl #8
+	str r3,[r1]
+
 
 
 MoveOrGame:
-	ldr r0, GameLogicFlag_Ptr ;get game logic flag, did the game logic already happen this frame
-	ldr r0, [r0]
-	cmp r0, #0				;if the GameLogic is 0, do the gamelogic, set flag at end to 1
-	beq MoveOncePerFrame
+	
+	ldr r0, Vcount_Ptr
+	ldr r1, [r0]
+	cmp r1, #160
+	blt SetFlagUp
+	ldr r0, GameLogicFlag_Ptr
+	ldr r1,[r0]
+	cmp r1,#1
+	beq GameLogic
+	
+	;check if not in blank, if not, check flag to render once in vblank
+	;if blank, check flag should i render
+	;once rendered, set flag not to render
+	
+SetFlagUp:
+	ldr r0, GameLogicFlag_Ptr
+	mov r1,#1
+	str r1,[r0]
+
 	b MoveOrGame2
 	
-	
 
-MoveOncePerFrame:
-	mov r0, #1
-	ldr r1, GameLogicFlag_Ptr
-	str r0, [r1]		;put gamelogic flag up
-	ldr r0, Vcount_Ptr ;get current vram line rendering
-	ldr r0, [r0]
-	cmp.b r0, #161		;check if in vblank currently rendering
-	bgt GameLogic
-	b MoveOrGame2			;else get to the Move part of MoveOrGame
+	
 	
 MoveOrGame2:
 	ldr r1, Delay_Ptr	;get move delay from memory
@@ -87,7 +112,6 @@ MoveOrGame2:
 	
 InfLoop:
     mov r3, #0x4000130
-
 	
 WaitNoInput:
     ; Load previous input (pressed = 1 logic)
@@ -115,12 +139,6 @@ WaitNoInput:
 	
     mov r0, r1               ; pass current input in r0 if needed
     b DirectionChecks
-	
-   ; ldrh r0, [r3]
-    ;and r0, r0, #0b0000000011110000
-    ;cmp r0, #0b0000000011110000
-    ;bne WaitNoInput     ; Wait until no buttons pressed
-    ;bne MoveOrGame  ; Wait until no buttons pressed, else go to MoveOrGame to decide whether to do game logic or come back
 
 
 WaitForInput:
@@ -206,24 +224,47 @@ JumpAnimation:
 	ldr r1, Delay_Ptr
 	str r0, [r1]
 	b MoveOrGame
+	
 
-GameLogic:
-	mov r0, #0
-	ldr r1, MoveOncePerFrame	;store gamelogicflag as down
-	str r0, [r1]
-	cmp.b r8,#136
-	bgt OutOfBoundDeath
-	cmp.b r8,#0
-	blt Death
-	b MoveOrGame
+
+GameLogic:	
+	mov r1, #0
+	ldr r0, GameLogicFlag_Ptr
+	str r1, [r0]		;Set GameLogicFlag_Ptr as down, do not tick again until out of vblank
+	
+	mov r4, #122			;frog 1 vertical pos
+	
+	ldr r0, FirstObjectPosition
+	ldr r1,[r0]		
+	mov r3, r1, asr #8
+	;bl ShowSpriteXor			;derender sprite
+	ldr r0, FirstObjectPosition
+	ldr r1,[r0]		
+	add r1,r1, #1
+	mov r3, r1, asr #8
+	cmp r3,#150
+	blt KeepValue
+	mov r3,#0
+	mov r1, r3
+KeepValue:
+	str r1,[r0]
+	bl ShowSpriteXor			;render car
+	
+	b InfLoop
 	
 	
 OutOfBoundDeath:
-
+	bl RemoveSprite
+	mov r8, #50
+	mov r9, #50
+	b Death
+	
 Death:
-	mov r8, #60
-	mov r9, #60
-	b InfLoop
+	
+	b MoveOrGame
+
+MoveBack:
+	mov r8,#20
 
 LoadBackground:
 	STMFD sp!, {r0-r7, lr}
@@ -237,6 +278,8 @@ BackgroundCopy:
 	bne BackgroundCopy
 	LDMFD sp!, {r0-r7, pc}
 
+;FROG RENDER START ----------------------------
+	
 ShowSprite:
 	mov r10,#0x06000000
 	mov r1,#2
@@ -374,17 +417,90 @@ RemoveSprite_NextByte:
     subs r4,r4,#1      ; Changed from r6 to r4
     bne RemoveSprite_NextLine
     LDMFD sp!, {r0-r7, pc}
+	
+;FROG RENDER END ----------------------------
+
+;CAR RENDER 16x16 START ---------------------
+
+;Xor Sprite, drawing twice will remove sprite from screen.
+ShowSpriteXor:
+    mov   r10, #0x06000000      ; VRAM base
+
+    ; Calculate destination address in VRAM from x (r3) and y (r4)
+    mov   r1, #2              ; 2 bytes per pixel
+    mul   r2, r1, r3          ; r2 = x coordinate * 2
+    add   r10, r10, r2        ; add X offset
+    mov   r11, r3             ; save starting x coordinate in r11
+
+    mov   r1, #480            ; 240 pixels per line * 2 bytes = 480 bytes/line
+    mul   r2, r1, r4          ; r2 = y coordinate * 480
+    add   r10, r10, r2        ; add Y offset
+
+    ; Load car sprite address from CarFirst_Literal
+    adr   r2, CarThird_Literal
+    ldr   r1, [r2]            ; r1 now holds address of car sprite data
+
+    mov   r6, #16             ; Height = 16 lines
+
+Sprite_NextLineXor:
+    mov   r5, #16             ; Width = 16 pixels per row
+    mov   r7, #0              ; Reset column counter for this row
+    STMFD sp!, {r10}          ; Save current row's VRAM pointer
+
+Sprite_NextByteXor:
+    add   r2, r11, r7         ; Compute absolute x: starting x (r11) + current column (r7)
+    cmp   r2, #148            ; if absolute x > 148, skip drawing this pixel
+    bgt   SkipPixelXor
+	;cmp r2, #0
+	;blt		SkipPixelXor
+    ldrH  r3, [r1], #2        ; load one halfword (pixel) from car sprite data; advance pointer
+    ldrH  r2, [r10]           ; load current VRAM pixel value at destination
+    eor   r3, r3, r2          ; XOR the sprite pixel with the background pixel
+    strH  r3, [r10], #2       ; store result back to VRAM; advance destination pointer
+    b     ContinuePixelXor
+
+SkipPixelXor:
+    ldrH  r3, [r1], #2        ; load (discard) the sprite pixel, advancing pointer
+    add   r10, r10, #2        ; advance VRAM pointer without drawing
+
+ContinuePixelXor:
+    add   r7, r7, #1          ; increment column counter
+    subs  r5, r5, #1          ; decrement pixel count for this row
+    bne   Sprite_NextByteXor  ; process next pixel in row
+
+    LDMFD sp!, {r10}          ; restore VRAM pointer to start of row
+    add   r10, r10, #480      ; advance to next scanline
+    subs  r6, r6, #1          ; decrement remaining line count
+    bne   Sprite_NextLineXor  ; loop for remaining rows
+
+    bx    lr
+
+
+CarThird_Literal:	.long CarThird_Data				;cars
+CarThird_Data:		.incbin "assets/cars/car_small3.img.bin"
+
+
+;CAR RENDER 16x16 END ---------------------
 
 BackgroundData_Ptr: .long BackgroundData
 
 CurrentFrame_Ptr:   .long 0x03000000
-;AnimDelay_Ptr:      .long 0x03000001
 Delay_Ptr:			.long 0x03005C00
-GameLogicFlag_Ptr:	.long 0x03000003
+GameLogicFlag_Ptr:	.long 0x03004A00
 Vcount_Ptr:			.long 0x04000006
 PreviousInput_Ptr: 	.long 0x03007F00
 
- 
+FirstObjectPosition:  .long  0x03000F28
+SecondObjectPosition:  .long 0x03000004
+ThirdObjectPosition:  .long 0x03000008
+FourthObjectPosition:  .long 0x0300000C
+FifthObjectPosition:   .long 0x03000010
+SixthObjectPosition:   .long 0x03000014
+SeventhObjectPosition: .long 0x03000018
+EighthObjectPosition:  .long 0x0300001C
+NinthObjectPosition:   .long 0x03000020
+TenthObjectPosition:   .long 0x03000024
+
 FrogNorth_Data: .incbin "assets/frogs/frogNorth.img.bin"
 FrogSouth_Data: .incbin "assets/frogs/frogSouth.img.bin"
 FrogEast_Data:  .incbin "assets/frogs/frogEast.img.bin"
@@ -394,6 +510,7 @@ FrogNorthJump_Data:  .incbin "assets/frogs/frogNorthJump.img.bin"  ; Jump frame 
 FrogSouthJump_Data:  .incbin "assets/frogs/frogSouthJump.img.bin"  ; Jump frame for south
 FrogEastJump_Data:   .incbin "assets/frogs/frogEastJump.img.bin"   ; Jump frame for east
 FrogWestJump_Data:   .incbin "assets/frogs/frogWestJump.img.bin"   ; Jump frame for west
+
 
 FrogNorth_Literal: .long FrogNorth_Data
 FrogSouth_Literal: .long FrogSouth_Data
