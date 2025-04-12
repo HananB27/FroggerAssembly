@@ -49,8 +49,8 @@ ProgramStart:
 
 	bl LoadBackground
 
-	
-	
+
+
 	mov r8,#52
 	mov r9,#146
 	and r8, r8, #0xFF
@@ -58,11 +58,11 @@ ProgramStart:
 	mov r6,#0 ; direction: 0=North, 1=South, 2=West, 3=East
 
 	bl ShowSprite
-	
+
 	;LANE 1 FIRST RENDER
-	
+
 	mov r4, #132			;CAR 1 vertical pos
-	
+
 	mov r0, #-16
 	mov r5, #3
 	mov r3,#-16
@@ -77,7 +77,7 @@ ProgramStart:
 
 	;LANE 2 FIRST RENDER
 	mov r4, #118			;CAR 1 vertical pos
-	
+
 	mov r0, #-16
 	mov r3,#-16
 	mov r5, #1
@@ -90,9 +90,24 @@ ProgramStart:
 	mov r5, #1
 	bl ShowSpriteXor
 
+    ;LANE 3 FIRST RENDER
+    mov r4, #104			;CAR 3 vertical pos (new position between lanes 1 and 2)
+
+    mov r0, #-16
+    mov r5, #4              ; Use car sprite 4
+    mov r3,#-16
+    bl ShowSpriteXor
+    mov r0, #-16
+    ldr r1, ThirdObjectPosition
+    mov r3,r0, asl #8
+    str r3,[r1]
+    mov r3, #-16+70
+    mov r5, #4
+    bl ShowSpriteXor
+
 
 MoveOrGame:
-	
+
 	ldr r0, Vcount_Ptr
 	ldr r1, [r0]
 	cmp r1, #160
@@ -101,21 +116,21 @@ MoveOrGame:
 	ldr r1,[r0]
 	cmp r1,#1
 	beq GameLogic
-	
+
 	;check if not in blank, if not, check flag to render once in vblank
 	;if blank, check flag should i render
 	;once rendered, set flag not to render
-	
+
 SetFlagUp:
 	ldr r0, GameLogicFlag_Ptr
 	mov r1,#1
 	str r1,[r0]
 
 	b MoveOrGame2
-	
 
-	
-	
+
+
+
 MoveOrGame2:
 	ldr r1, Delay_Ptr	;get move delay from memory
 	ldr r0, [r1]
@@ -125,11 +140,11 @@ MoveOrGame2:
 	ldr r1, Delay_Ptr
 	str r0, [r1]
 	b MoveOrGame
-	
-	
+
+
 InfLoop:
     mov r3, #0x4000130
-	
+
 WaitNoInput:
     ; Load previous input (pressed = 1 logic)
     ldr r0, PreviousInput_Ptr
@@ -153,7 +168,7 @@ WaitNoInput:
     beq MoveOrGame
 
     ; Else → new directional press
-	
+
     mov r0, r1               ; pass current input in r0 if needed
     b DirectionChecks
 
@@ -167,13 +182,13 @@ WaitForInput:
 	beq MoveOrGame		;same ol same ol
 
 DirectionChecks:
-	
+
     bl RemoveSprite
 
 	ldrh r1, [r3]
 	mov r0, r1
     and r0, r0, #0b0000000011110000
-	
+
     ; Check directions once per press
     tst r0,#0b0000000001000000 ; Up
     bne CheckDown
@@ -241,27 +256,27 @@ JumpAnimation:
 	ldr r1, Delay_Ptr
 	str r0, [r1]
 	b MoveOrGame
-	
 
 
-GameLogic:	
+
+GameLogic:
 	mov r1, #0
 	ldr r0, GameLogicFlag_Ptr
 	str r1, [r0]		;Set GameLogicFlag_Ptr as down, do not tick again until out of vblank
-	
+
 	;LANE 1 FIRST RENDER
 	mov r4, #132			;car 1 vertical pos
-	
+
 	ldr r0, FirstObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8
 	mov r5,#3
-	
-	
+
+
 	bl ShowSpriteXor			;derender sprite1
-	
+
 	ldr r0, FirstObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8			;get pixel
 	add r3,r3,#70				;second car offset
 	cmp r3,#150
@@ -270,12 +285,12 @@ GameLogic:
 DontWrapValue:
 	mov r5, #3
 	bl ShowSpriteXor			;derender sprite2
-	
+
 	ldr r0, FirstObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	add r1,r1, #60				;add subpixel
 	mov r3, r1, asr #8			;get pixel
-	
+
 	cmp r3,#150					;wrap around
 	blt KeepValue
 	;mov r3,#-16
@@ -284,14 +299,14 @@ DontWrapValue:
 KeepValue:
 	str r1,[r0]
 	mov r5, #3
-	
+
 	;r3 contains pixel value of car, r9 contains vertical of frog, check if frog is in lane, and if he is, check the horizontal.
 	;r0, r1 and r2 are free
 	add r1, r9, #16
-	
+
 	bl ShowSpriteXor			;render sprite1
 	ldr r0, FirstObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8			;get pixel
 	add r3,r3,#70
 	cmp r3,#150
@@ -300,11 +315,11 @@ KeepValue:
 DontWrapValue11:
 	mov r5, #3
 	bl ShowSpriteXor			;render sprite 2
-	
+
 	cmp r9,#132			;frog vertical position equal to only possible position in this lane
 	bne SkipCollisionLane1
 	ldr r0, FirstObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8			;get pixel
 	mov     r1, r3          ; r1 = obj1.x
     add     r2, r1, #14     ; r2 = obj1.x + 14
@@ -316,10 +331,10 @@ DontWrapValue11:
     ble     NoCollision1     ;    no collision
 
     b       Death           ; Collision occurred
-	
+
 NoCollision1:
 	ldr r0, FirstObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8			;get pixel
 	add r3,r3,#70
 	cmp r3,#150
@@ -339,23 +354,24 @@ DontWrapValue115:
 
 
 NoCollision2:
-	
-;LANE 1 END 
+
+
+;LANE 1 END
 ;--------------------------------------------------------
 ;LANE 2 FIRST RENDER
 ;car GOING LEFT
 
 SkipCollisionLane1:
 	mov r4, #118			;car 1 vertical pos
-	
+
 	ldr r0, SecondObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8
 	mov r5, #1
 	bl ShowSpriteXor			;derender sprite1
-	
+
 	ldr r0, SecondObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8			;get pixel
 	add r3,r3,#-120				;second car offset
 	cmp r3,#-16				;less than -16 for left
@@ -364,12 +380,12 @@ SkipCollisionLane1:
 DontWrapValue2:
 	mov r5, #1
 	bl ShowSpriteXor			;derender sprite2
-	
+
 	ldr r0, SecondObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	add r1,r1, #-200				;add subpixel, now -
 	mov r3, r1, asr #8			;get pixel
-	
+
 	cmp r3,#-16				;wrap around, from left
 	bgt KeepValue2
 	;mov r3,#-16
@@ -380,7 +396,7 @@ KeepValue2:
 	mov r5, #1
 	bl ShowSpriteXor			;render sprite1
 	ldr r0, SecondObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8			;get pixel
 	add r3,r3,#-120				;second car offset
 	cmp r3,#-16					;-16
@@ -393,7 +409,7 @@ DontWrapValue22:
 	cmp r9,#118			;frog vertical position equal to only possible position in this lane
 	bne SkipCollisionLane12
 	ldr r0, SecondObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8			;get pixel
 	mov     r1, r3          ; r1 = obj1.x
     add     r2, r1, #14     ; r2 = obj1.x + 14
@@ -405,10 +421,10 @@ DontWrapValue22:
     ble     NoCollision12     ;    no collision
 
     b       Death           ; Collision occurred
-	
+
 NoCollision12:
 	ldr r0, SecondObjectPosition
-	ldr r1,[r0]		
+	ldr r1,[r0]
 	mov r3, r1, asr #8			;get pixel
 	add r3,r3,#-120				;second car offset
 	cmp r3,#-16					;-16
@@ -428,12 +444,97 @@ DontWrapValue1152:
 
 SkipCollisionLane12:
 NoCollision22:
-	
-	;cmp r8, #
-	;Lane1Collision
-	cmp r9, #6
-	bne SkipVictoryCheck
-		
+	;LANE 3 FIRST RENDER (Moving right like Lane 1)
+    mov r4, #104			;CAR 3 vertical pos
+
+    ldr r0, ThirdObjectPosition
+    ldr r1,[r0]
+    mov r3, r1, asr #8
+    mov r5, #4              ; Use car sprite 4
+
+
+    bl ShowSpriteXor			;derender sprite1
+
+    ldr r0, ThirdObjectPosition
+    ldr r1,[r0]
+    mov r3, r1, asr #8			;get pixel
+    add r3,r3,#70				;second car offset
+    cmp r3,#150
+    blt DontWrapValue3
+    sub r3,r3,#166
+    DontWrapValue3:
+    mov r5, #4
+    bl ShowSpriteXor			;derender sprite2
+
+    ldr r0, ThirdObjectPosition
+    ldr r1,[r0]
+    add r1,r1, #75				;add subpixel (slightly faster than lane 1)
+    mov r3, r1, asr #8			;get pixel
+
+    cmp r3,#150					;wrap around
+    blt KeepValue3
+    sub r3,r3,#166
+    mov r1, r3, lsl#8
+    KeepValue3:
+    str r1,[r0]
+    mov r5, #4
+
+    bl ShowSpriteXor			;render sprite1
+    ldr r0, ThirdObjectPosition
+    ldr r1,[r0]
+    mov r3, r1, asr #8			;get pixel
+    add r3,r3,#70
+    cmp r3,#150
+    blt DontWrapValue31
+    sub r3,r3,#166
+    DontWrapValue31:
+    mov r5, #4
+    bl ShowSpriteXor			;render sprite 2
+
+    cmp r9,#104			;frog vertical position equal to only possible position in this lane
+    bne SkipCollisionLane3
+    ldr r0, ThirdObjectPosition
+    ldr r1,[r0]
+    mov r3, r1, asr #8			;get pixel
+    mov     r1, r3          ; r1 = obj1.x
+    add     r2, r1, #14     ; r2 = obj1.x + 14
+    cmp     r2, r8          ; if (obj1.x + 14 <= obj2.x)
+    ble     NoCollision3     ;    no collision
+
+    add     r2, r8, #12     ; r2 = obj2.x + 12
+    cmp     r2, r3          ; if (obj2.x + 12 <= obj1.x)
+    ble     NoCollision3     ;    no collision
+
+    b       Death           ; Collision occurred
+
+    NoCollision3:
+    ldr r0, ThirdObjectPosition
+    ldr r1,[r0]
+    mov r3, r1, asr #8			;get pixel
+    add r3,r3,#70
+    cmp r3,#150
+    blt DontWrapValue315
+    sub r3,r3,#166
+    DontWrapValue315:
+    mov     r1, r3          ; r1 = obj1.x
+    add     r2, r1, #14     ; r2 = obj1.x + 14
+    cmp     r2, r8          ; if (obj1.x + 14 <= obj2.x)
+    ble     NoCollision32    ;    no collision
+
+    add     r2, r8, #12     ; r2 = obj2.x + 12
+    cmp     r2, r3          ; if (obj2.x + 12 <= obj1.x)
+    ble     NoCollision32    ;    no collision
+
+    b       Death           ; Collision occurred
+
+    SkipCollisionLane3:
+NoCollision32:
+
+    ;cmp r8, #
+    ;Lane1Collision
+    cmp r9, #6
+    bne SkipVictoryCheck
+
 SkipVictoryCheck:
 	; Check if frog has reached the top row where victory zones are
 	cmp r9, #6
@@ -525,7 +626,7 @@ OutOfBoundDeath:
 	mov r8, #50
 	mov r9, #50
 	b Death
-	
+
 Death:
 	bl RemoveSprite
 	mov r8, #170
@@ -548,7 +649,7 @@ BackgroundCopy:
 	LDMFD sp!, {r0-r7, pc}
 
 ;FROG RENDER START ----------------------------
-	
+
 ShowSprite:
 	mov r10,#0x06000000
 	mov r1,#2
@@ -610,7 +711,7 @@ WestJump:
 	b AfterLoadFrog
 
 CheckEast:
-	cmp r5, #0          
+	cmp r5, #0
    	bne EastJump
 	adr r4, sprite_literals
 	ldr r7, [r4, #24]
@@ -686,7 +787,7 @@ RemoveSprite_NextByte:
     subs r4,r4,#1      ; Changed from r6 to r4
     bne RemoveSprite_NextLine
     LDMFD sp!, {r0-r7, pc}
-	
+
 ;FROG RENDER END ----------------------------
 
 ;CAR RENDER 16x16 START ---------------------
@@ -706,15 +807,26 @@ ShowSpriteXor:
     add   r10, r10, r2        ; add Y offset
 
     ; Load car sprite address from CarThird_Literal
-	cmp   r5, #3
-	bne NotThird
-	adr   r2, CarThird_Literal	;actually r0 and r0 holds it
-NotThird:
-	cmp   r5,#1
-	bne NotFirst
-	adr   r2, CarFirst_Literal
-NotFirst:
-    ldr   r1, [r2]            ; r1 now holds address of car sprite data
+	cmp   r5, #1
+    bne   NotSecond
+    adr   r2, CarFirst_Literal
+    b     AfterCarLoad
+    NotSecond:
+    cmp   r5, #3
+    bne   NotThird
+    adr   r2, CarThird_Literal
+    b     AfterCarLoad
+    NotThird:
+    cmp   r5, #4
+    bne   NotFirst
+    adr   r2, CarFourth_Literal
+    b     AfterCarLoad
+    NotFirst:
+    ; Fallback/default
+    ldr   r2, CarFirst_Literal
+
+    AfterCarLoad:
+    ldr   r1, [r2]
 
     mov   r6, #16             ; Height = 16 lines
 
@@ -753,6 +865,9 @@ ContinuePixelXor:
 
 CarThird_Literal: .long CarThird_Data      ; cars
 CarThird_Data:    .incbin "assets/cars/car_small3.img.bin"
+
+CarFourth_Literal: .long CarFourth_Data
+CarFourth_Data:    .incbin "assets/cars/car_small4.img.bin"
 
 CarFirst_Literal: .long CarFirst_Data      ; cars
 CarFirst_Data:    .incbin "assets/cars/car_small1.img.bin"
