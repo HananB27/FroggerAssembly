@@ -523,13 +523,13 @@ DontWrapValue315:
 SkipCollisionLane3:
 NoCollision32:
     ; Check for water death (y position between 16 and 64)
-    cmp r9, #64
-    bgt SkipWaterCheck    ; If y > 64, skip water check
-    cmp r9, #16
-    blt SkipWaterCheck    ; If y < 16, skip water check
+    ;cmp r9, #64
+    ;bgt SkipWaterCheck    ; If y > 64, skip water check
+    ;cmp r9, #16
+    ;blt SkipWaterCheck    ; If y < 16, skip water check
 
     ; We're in water zone - trigger water death
-    b WaterDeath
+    ;b WaterDeath
 
 SkipWaterCheck:
     cmp r9, #6
@@ -587,12 +587,46 @@ SkipVictoryLogic:
 HandleVictory:
     STMFD sp!, {r0-r7, lr}
 
-    ; First show the frog in the victory position
-    bl ShowSprite
+    ; Remove player frog sprite
+    bl RemoveSprite
 
-    ; Victory celebration delay - Fixed for large immediate value
-    mov r0, #0xF000     ; Use a smaller value that fits in immediate
-    mov r1, #3          ; Multiply by using a loop
+    ; Calculate victory zone center position
+    mov r9, #6         ; Victory row Y position
+
+    ; Show victory frog sprite
+    mov r10, #0x06000000
+    mov r1, #2
+    mul r2, r1, r8     ; X position
+    add r10, r10, r2
+    mov r1, #480       ; 240*2
+    mul r2, r1, r9     ; Y position
+    add r10, r10, r2
+
+    ; Load victory frog sprite data using DataSection
+    ldr r12, DataSection_Address
+    ldr r1, [r12, #64]  ; VictoryFrog_Ptr (16 * 4 = 64, as it's the 17th entry)
+
+    mov r4, #16        ; Height
+VictoryFrog_NextLine:
+    mov r5, #16        ; Width
+    STMFD sp!, {r10}
+VictoryFrog_NextPixel:
+    ldrH r3, [r1], #2
+    cmp r3, #0
+    beq VictoryFrog_Skip
+    strH r3, [r10]
+VictoryFrog_Skip:
+    add r10, r10, #2
+    subs r5, r5, #1
+    bne VictoryFrog_NextPixel
+    LDMFD sp!, {r10}
+    add r10, r10, #480
+    subs r4, r4, #1
+    bne VictoryFrog_NextLine
+
+    ; Victory celebration delay
+    mov r0, #0xF000
+    mov r1, #3
 VictoryDelayOuter:
     mov r2, r0
 VictoryDelayInner:
@@ -601,12 +635,9 @@ VictoryDelayInner:
     subs r1, r1, #1
     bne VictoryDelayOuter
 
-    ; Remove sprite from victory position
-    bl RemoveSprite
-
-    ; Teleport player back to starting position
-    mov r8, #52
-    mov r9, #146
+    ; Return player to starting position
+    mov r8, #52         ; Starting X position
+    mov r9, #146        ; Starting Y position
     and r8, r8, #0xFF
     and r9, r9, #0xFF
     mov r6, #0          ; Face north
@@ -1088,6 +1119,8 @@ Death6_Literal: .long Death6_Data
 Death7_Literal: .long Death7_Data
 ;END OF DEATH SPRITES ---------------
 
+VictoryFrog_Data: .incbin "assets/map/finishFrog1.img.bin"
+VictoryFrog_Literal: .long VictoryFrog_Data
 
 .align 4
 DataSection:
@@ -1107,6 +1140,7 @@ DataSection:
     NinthObjectPosition:  .long 0x03000020
     TenthObjectPosition:  .long 0x03000024
     BackgroundData_Ptr:   .long BackgroundData
+    VictoryFrog_Ptr:      .long VictoryFrog_Data
 
 
 FrogNorth_Data: .incbin "assets/frogs/frogNorth.img.bin"
