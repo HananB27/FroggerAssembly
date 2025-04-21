@@ -230,8 +230,8 @@ AfterDirectionCheck:
     strb r7, [r4]
     bl ShowSprite       ; This will use current r6 value for direction
 
-    ; Small delay for jump frame
-    mov r0,#0x5FFF
+    ; Increase the delay for jump frame
+    mov r0,#0x8FFF     ; Increased from 0x5FFF to 0x8FFF
 Delay1:
     subs r0,r0,#1
     bne Delay1
@@ -247,8 +247,8 @@ JumpAnimation:
     strb r7, [r4]
     bl ShowSprite       ; This will use current r6 value for direction
 
-    ; Delay before next input
-    mov r0,#0x1AFF
+    ; Increase delay before next input
+    mov r0,#0x2FFF     ; Increased from 0x1AFF to 0x2FFF
     ldr r12, DataSection_Address
     ldr r1, [r12, #4]   ; Delay_Ptr
     str r0, [r1]
@@ -522,6 +522,16 @@ DontWrapValue315:
 
 SkipCollisionLane3:
 NoCollision32:
+    ; Check for water death (y position between 16 and 64)
+    cmp r9, #64
+    bgt SkipWaterCheck    ; If y > 64, skip water check
+    cmp r9, #16
+    blt SkipWaterCheck    ; If y < 16, skip water check
+
+    ; We're in water zone - trigger water death
+    b WaterDeath
+
+SkipWaterCheck:
     cmp r9, #6
     bne SkipVictoryCheck
 SkipVictoryCheck:
@@ -661,9 +671,60 @@ DeathDelay_Short:
 
     ; Instead of resetting position, restart the entire game
     b ProgramStart        ; Branch back to game start
+WaterDeath:
+    STMFD sp!, {r0-r7, lr}    ; Save registers
+
+    ; First remove the frog sprite
+    bl RemoveSprite
+
+    ; Store original death coordinates
+    mov r11, r8        ; Save X coordinate
+    mov r12, r9        ; Save Y coordinate
+
+    ; Water Death Animation Frame 1
+    ldr r4, Death4_Literal_Addr
+    ldr r1, [r4]
+    bl ShowDeathFrame
+    bl DeathDelay
+    bl RemoveDeathFrame    ; Clear frame 1
+
+    ; Water Death Animation Frame 2
+    ldr r4, Death5_Literal_Addr
+    ldr r1, [r4]
+    bl ShowDeathFrame
+    bl DeathDelay
+    bl RemoveDeathFrame    ; Clear frame 2
+
+    ; Water Death Animation Frame 3
+    ldr r4, Death6_Literal_Addr
+    ldr r1, [r4]
+    bl ShowDeathFrame
+    bl DeathDelay
+    bl RemoveDeathFrame    ; Clear frame 3
+
+    mov r0, #0x7FFF        ; Shorter pause before skeleton
+    mov r1, #1
+WaterDeathDelay_Short:
+    subs r0, r0, #1
+    bne WaterDeathDelay_Short
+
+    ; Death Animation Frame 4 (Death7 - skeleton)
+    ldr r4, Death7_Literal_Addr
+    ldr r1, [r4]
+    bl ShowDeathFrame
+    bl DeathDelay
+    bl RemoveDeathFrame    ; Clear final frame
+
+    LDMFD sp!, {r0-r7, lr}    ; Restore registers
+
+    ; Restart the game
+    b ProgramStart
 Death1_Literal_Addr: .long Death1_Literal
 Death2_Literal_Addr: .long Death2_Literal
 Death3_Literal_Addr: .long Death3_Literal
+Death4_Literal_Addr: .long Death4_Literal
+Death5_Literal_Addr: .long Death5_Literal
+Death6_Literal_Addr: .long Death6_Literal
 Death7_Literal_Addr: .long Death7_Literal
 
 SkipLiterals:
@@ -709,9 +770,42 @@ ShowDeathFrame_Skip:
 ; Helper routine to remove death frame
 RemoveDeathFrame:
     STMFD sp!, {r0-r7, lr}
-    mov r8, r11              ; Restore death X coordinate
-    mov r9, r12              ; Restore death Y coordinate
-    bl RemoveSprite
+    mov r10, #0x06000000
+    mov r1, #2
+    mul r2, r1, r11         ; Use saved death X coordinate
+    add r10, r10, r2
+    mov r1, #240*2
+    mul r2, r1, r12         ; Use saved death Y coordinate
+    add r10, r10, r2
+
+    ; Get background data pointer properly
+    ldr r7, DataSection_Address  ; Use r7 instead of r12
+    ldr r0, [r7, #60]  ; BackgroundData_Ptr
+    mov r1, r12             ; Y coordinate
+    mov r2, #240
+    mul r3, r1, r2
+    add r3, r3, r11         ; Add X coordinate
+    mov r2, #2
+    mul r3, r2, r3
+    add r0, r0, r3
+
+    mov r4, #16             ; Height
+RemoveDeathFrame_NextLine:
+    mov r5, #16             ; Width
+    STMFD sp!, {r10, r0}
+RemoveDeathFrame_NextByte:
+    ldrH r3, [r0], #2      ; Load background pixel
+    strH r3, [r10], #2     ; Restore background pixel
+    subs r5, r5, #1
+    bne RemoveDeathFrame_NextByte
+    LDMFD sp!, {r10, r0}
+    add r10, r10, #240*2   ; Next VRAM line
+    add r0, r0, #240*2     ; Next background line
+    subs r4, r4, #1
+    bne RemoveDeathFrame_NextLine
+
+    LDMFD sp!, {r0-r7, pc}
+
     LDMFD sp!, {r0-r7, pc}
 
 ; Delay between death animation frames
@@ -866,7 +960,7 @@ RemoveSprite:
     mov r1,#240*2
     mul r2,r1,r9
     add r10,r10,r2
-    ldr r0, BackgroundData_Ptr
+    ldr r0, [r12,#60]
     mov r1, r9
     mov r2, #240
     mul r3, r1, r2
@@ -979,12 +1073,18 @@ CarFirst_Data:    .incbin "assets/cars/car_small1.img.bin"
 Death1_Data: .incbin "assets/death/death1.img.bin"
 Death2_Data: .incbin "assets/death/death2.img.bin"
 Death3_Data: .incbin "assets/death/death3.img.bin"
+Death4_Data: .incbin "assets/death/death4.img.bin"
+Death5_Data: .incbin "assets/death/death5.img.bin"
+Death6_Data: .incbin "assets/death/death6.img.bin"
 Death7_Data: .incbin "assets/death/death7.img.bin"
 
 ; Add pointers to the death animation frames
 Death1_Literal: .long Death1_Data
 Death2_Literal: .long Death2_Data
 Death3_Literal: .long Death3_Data
+Death4_Literal: .long Death4_Data
+Death5_Literal: .long Death5_Data
+Death6_Literal: .long Death6_Data
 Death7_Literal: .long Death7_Data
 ;END OF DEATH SPRITES ---------------
 
