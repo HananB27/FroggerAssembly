@@ -706,7 +706,7 @@ CheckThirdTurtle:
     ; Third turtle: x=62 to x=77
     cmp r8, #62
     blt WaterDeath          ; Less than turtle 3 start
-    cmp r8, #77
+    cmp r8, #71
     ble OnTurtle            ; On turtle 3
     b WaterDeath            ; Not on any turtle
 
