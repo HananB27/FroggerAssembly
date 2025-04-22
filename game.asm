@@ -104,21 +104,37 @@ ProgramStart:
     mov r5, #4
     bl ShowSpriteXor
 
+	;LANE 4 FIRST RENDER
+    mov r4, #90            ;CAR 1 vertical pos
+
+    mov r0, #-16
+    mov r3,#-16
+    mov r5, #5
+    bl ShowSpriteXor
+	
+    mov r0, #-16
+    ldr r1, [r12, #32]  ; FourthObjectPosition
+    mov r3,r0, asl #8
+    str r3,[r1]
+    mov r3, #56			;x pos of car offset
+    mov r5, #5
+    bl ShowSpriteXor
+
     mov r4, #62       ; Turtle vertical position (in water area)
 
     ; First turtle
     mov r3, #30         ; X position
-    mov r5, #5          ; Use sprite type 5 for turtle
+    mov r5, #6          ; Use sprite type 5 for turtle
     bl ShowSpriteXor
 
     ; Second turtle
     mov r3, #46         ; X position
-    mov r5, #5          ; Use sprite type 5 for turtle
+    mov r5, #6          ; Use sprite type 5 for turtle
     bl ShowSpriteXor
 
     ; Third turtle
     mov r3, #62       ; X position
-    mov r5, #5          ; Use sprite type 5 for turtle
+    mov r5, #6          ; Use sprite type 5 for turtle
     bl ShowSpriteXor
 
 MoveOrGame:
@@ -478,7 +494,7 @@ DontWrapValue3:
 
     ldr r0, [r12, #28]  ; ThirdObjectPosition
     ldr r1, [r0]
-    add r1, r1, #75     ; add subpixel (slightly faster than lane 1)
+    add r1, r1, #160     ; add subpixel (slightly faster than lane 1)
     mov r3, r1, asr #8  ; get pixel
 
     cmp r3, #150        ; wrap around
@@ -537,24 +553,113 @@ DontWrapValue315:
 
     b Death             ; Collision occurred
 
-SkipCollisionLane3:
+;--------------------------------------------------------
+;LANE 4 FIRST RENDER
+;car GOING LEFT
 NoCollision32:
+SkipCollisionLane3:
+    mov r4, #90        ; car 1 vertical pos
+
+    ldr r12, DataSection_Address
+    ldr r0, [r12, #32]  ; FourthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8
+    mov r5, #5
+    bl ShowSpriteXor    ; derender sprite1
+
+    ldr r0, [r12, #32]  ; FourthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    add r3, r3, #-110   ; second car offset
+    cmp r3, #-32        ; less than -16 for left, -32
+    bgt DontWrapValue24
+    add r3, r3, #182    ; add
+DontWrapValue24:
+    mov r5, #5
+    bl ShowSpriteXor    ; derender sprite2
+
+    ldr r0, [r12, #32]  ; FourthObjectPosition
+    ldr r1, [r0]
+    add r1, r1, #-300   ; add subpixel, now -
+    mov r3, r1, asr #8  ; get pixel
+
+    cmp r3, #-32        ; wrap around, from left
+    bgt KeepValue24
+    add r3, r3, #182   ; add for left
+    mov r1, r3, lsl #8
+KeepValue24:
+    str r1, [r0]
+    mov r5, #5
+    bl ShowSpriteXor    ; render sprite1
+
+    ldr r0, [r12, #32]  ; FourthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    add r3, r3, #-110   ; second car offset
+    cmp r3, #-32       ; -16
+    bgt DontWrapValue224
+    add r3, r3, #182    ; add
+DontWrapValue224:
+    mov r5, #5
+    bl ShowSpriteXor    ; render sprite 2
+
+    ; COLLISION FOR LANE 4
+    cmp r9, #90        ; frog vertical position equal to only possible position in this lane
+    bne SkipCollisionLane124
+    ldr r0, [r12, #32]  ; FourthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    mov r1, r3          ; r1 = obj1.x
+    add r2, r1, #30     ; r2 = obj1.x + 30  WIDTH OF CAR
+    cmp r2, r8          ; if (obj1.x + 30 <= obj2.x)
+    ble NoCollision124   ; no collision
+
+    add r2, r8, #12     ; r2 = obj2.x + 12
+    cmp r2, r3          ; if (obj2.x + 12 <= obj1.x)
+    ble NoCollision124   ; no collision
+
+    b Death             ; Collision occurred
+NoCollision124:
+    ldr r12, DataSection_Address
+    ldr r0, [r12, #32]  ; FourthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    add r3, r3, #-110   ; second car offset
+    cmp r3, #-32    ; check if it wraps around, 32 for big cars
+    bgt DontWrapValue11524
+    add r3, r3, #182    ; add
+DontWrapValue11524:
+    mov r1, r3          ; r1 = obj1.x
+    add r2, r1, #30     ; r2 = obj1.x + 30		WIDTH OF CAR
+    cmp r2, r8          ; if (obj1.x + 30 <= obj2.x)
+    ble NoCollision224   ; no collision
+
+    add r2, r8, #12     ; r2 = obj2.x + 12
+    cmp r2, r3          ; if (obj2.x + 12 <= obj1.x)
+    ble NoCollision224   ; no collision
+
+    b Death             ; Collision occurred
+
+SkipCollisionLane124:
+NoCollision224:
+
+NoCollision323:
     mov r4, #62       ; Turtle vertical position
 
     ; Clear first turtle
     ldr r12, DataSection_Address
     mov r3, #30         ; X position
-    mov r5, #5          ; Use sprite type 5 for turtle
+    mov r5, #6          ; Use sprite type 6 for turtle
     bl ShowSpriteXor    ; XOR to clear
 
     ; Clear second turtle
     mov r3, #46        ; X position
-    mov r5, #5          ; Use sprite type 5 for turtle
+    mov r5, #6          ; Use sprite type 6 for turtle
     bl ShowSpriteXor    ; XOR to clear
 
     ; Clear third turtle
     mov r3, #62        ; X position
-    mov r5, #5          ; Use sprite type 5 for turtle
+    mov r5, #6          ; Use sprite type 6 for turtle
     bl ShowSpriteXor    ; XOR to clear
 
     ; Now redraw turtles (possibly with updated positions)
@@ -562,15 +667,15 @@ NoCollision32:
 
     ; Redraw first turtle
     ldr r12, DataSection_Address
-    ldr r0, [r12, #68]  ; Turtle1_Ptr
-    ldr r1, [r0]
+    ;ldr r0, [r12, #68]  ; Turtle1_Ptr
+    ;ldr r1, [r0]
     mov r3, #30         ; X position
-    mov r5, #5          ; Use sprite type 5 for turtle
+    mov r5, #6          ; Use sprite type 6 for turtle
     bl ShowSpriteXor
 
     ; Redraw second turtle
     mov r3, #46        ; X position
-    mov r5, #5          ; Use sprite type 5 for turtle
+    mov r5, #6          ; Use sprite type 6 for turtle
     bl ShowSpriteXor
 
 SkipWaterCheck:
@@ -675,7 +780,7 @@ HandleVictory:
     cmp r8, #32
     addge r2, r2, #4
     cmp r8, #64
-    subge r2, r2, #15 
+    subge r2, r2, #15
     cmp r8, #96
     addge r2, r2, #4
     cmp r8, #128
@@ -1121,38 +1226,83 @@ ShowSpriteXor:
 
     ; Load sprite address based on type in r5
     cmp   r5, #1
+
+
+
+
+    ; Load car sprite address from CarThird_Literal
+	cmp   r5, #1
     bne   NotSecond
     adr   r2, CarFirst_Literal
+	mov r0,#16
     b     AfterCarLoad
+
+CarFirst_Literal: .long CarFirst_Data      ; cars
+CarFirst_Data:    .incbin "assets/cars/car_small1.img.bin"
 
     NotSecond:
     cmp   r5, #3
     bne   NotThird
     adr   r2, CarThird_Literal
+	mov r0,#16
     b     AfterCarLoad
+
+CarThird_Literal: .long CarThird_Data      ; cars
+CarThird_Data:    .incbin "assets/cars/car_small3.img.bin"
+
 
     NotThird:
     cmp   r5, #4
     bne   NotFourth
-    adr   r2, CarFourth_Literal
+    adr   r2, CarFourth_Literal		;is good
+	mov r0,#16
     b     AfterCarLoad
 
-    NotFourth:
-    cmp   r5, #5
-    bne   NotTurtle
-    ldr   r2, [r12,#68]  ; Use the literal directly instead of accessing through r12
-    b     AfterCarLoad
 
-    NotTurtle:
-    ; Fallback/default for any other sprite type
+CarFourth_Literal: .long CarFourth_Data
+CarFourth_Data:    .incbin "assets/cars/car_small4.img.bin"
+
+
+
+	NotFourth:
+	cmp 	r5, #5
+	bne		 NotFifth
+	adr		 r2, CarBig_Literal
+	mov r0,#32
+	b 		AfterCarLoad
+
+CarBig_Literal:		.long CarBig_Data		;car big
+CarBig_Data:		.incbin "assets/cars/car_big1.img.bin"
+
+	NotFifth:
+	cmp 	r5, #6
+	bne		 NotFirst
+	adr r2, Turtle1_Literal
+	
+	;adr		 r2, CarBig_Literal
+	mov r0,#16
+	b 		AfterCarLoad
+	
+Turtle1_Data: .incbin "assets/river/turtles/turtle1.img.bin"
+Turtle1_Literal: .long Turtle1_Data
+
+    NotFirst:
+    ; Fallback/default
     ldr   r2, CarFirst_Literal
-
+	mov r0,#16
     AfterCarLoad:
     ldr   r1, [r2]
 
     mov   r6, #16             ; Height = 16 lines
+
+
+
+
+
+
 Sprite_NextLineXor:
-    mov   r5, #16             ; Width = 16 pixels per row
+
+	mov   r5, r0            ; Width = 16 pixels per row
     mov   r7, #0              ; Reset column counter for this row
     STMFD sp!, {r10}          ; Save current row's VRAM pointer
 
@@ -1184,14 +1334,9 @@ ContinuePixelXor:
 
     bx    lr
 
-CarThird_Literal: .long CarThird_Data      ; cars
-CarThird_Data:    .incbin "assets/cars/car_small3.img.bin"
 
-CarFourth_Literal: .long CarFourth_Data
-CarFourth_Data:    .incbin "assets/cars/car_small4.img.bin"
 
-CarFirst_Literal: .long CarFirst_Data      ; cars
-CarFirst_Data:    .incbin "assets/cars/car_small1.img.bin"
+
 
 ;CAR RENDER 16x16 END ---------------------
 ;DEATH SPRIES ------------------
@@ -1203,8 +1348,6 @@ Death5_Data: .incbin "assets/death/death5.img.bin"
 Death6_Data: .incbin "assets/death/death6.img.bin"
 Death7_Data: .incbin "assets/death/death7.img.bin"
 
-Turtle1_Data: .incbin "assets/river/turtles/turtle1.img.bin"
-Turtle1_Literal: .long Turtle1_Data
 
 
 ; Add pointers to the death animation frames
@@ -1222,24 +1365,26 @@ VictoryFrog_Literal: .long VictoryFrog_Data
 
 .align 4
 DataSection:
-    CurrentFrame_Ptr:   .long 0x03000000 ;0
-    Delay_Ptr:         .long 0x03005C00 ;4
-    GameLogicFlag_Ptr: .long 0x03004A00 ;8
-    Vcount_Ptr:        .long 0x04000006 ;12
-    PreviousInput_Ptr: .long 0x03007F00 ;16
-    FirstObjectPosition:  .long 0x03000F28  ;20
-    SecondObjectPosition: .long 0x03000004  ;24
-    ThirdObjectPosition:  .long 0x03000008  ;28
-    FourthObjectPosition: .long 0x0300000C  ;32
-    FifthObjectPosition:  .long 0x03000010  ;36
-    SixthObjectPosition:  .long 0x03000014  ;40
-    SeventhObjectPosition:.long 0x03000018  ;44
-    EighthObjectPosition: .long 0x0300001C  ;48
-    NinthObjectPosition:  .long 0x03000020  ;52
-    TenthObjectPosition:  .long 0x03000024  ;56
-    BackgroundData_Ptr:   .long BackgroundData  ;60
-    VictoryFrog_Ptr:      .long VictoryFrog_Data    ;64
-    Turtle1_Ptr: .long Turtle1_Literal ;68
+    CurrentFrame_Ptr:   .long 0x03000000
+    Delay_Ptr:         .long 0x03005C00
+    GameLogicFlag_Ptr: .long 0x03004A00
+    Vcount_Ptr:        .long 0x04000006
+    PreviousInput_Ptr: .long 0x03007F00
+    FirstObjectPosition:  .long 0x03000F28		;20
+    SecondObjectPosition: .long 0x03000004
+    ThirdObjectPosition:  .long 0x03000008
+    FourthObjectPosition: .long 0x0300000C
+    FifthObjectPosition:  .long 0x03000010
+    SixthObjectPosition:  .long 0x03000014		;40
+    SeventhObjectPosition:.long 0x03000018
+    EighthObjectPosition: .long 0x0300001C
+    NinthObjectPosition:  .long 0x03000020
+    TenthObjectPosition:  .long 0x03000024
+    BackgroundData_Ptr:   .long BackgroundData	;60
+	VictoryFrog_Ptr:      .long VictoryFrog_Data    ;64
+    ;Turtle1_Ptr: .long Turtle1_Literal ;68
+
+	;CarBig_Literal:			.long CarBig_Data
 
 
 FrogNorth_Data: .incbin "assets/frogs/frogNorth.img.bin"
