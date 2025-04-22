@@ -591,12 +591,21 @@ HandleVictory:
     bl RemoveSprite
 
     ; Calculate victory zone center position
-    mov r9, #6         ; Victory row Y position
+    mov r9, #4         ; Victory row Y position
 
     ; Show victory frog sprite
     mov r10, #0x06000000
     mov r1, #2
     mul r2, r1, r8     ; X position
+    add r2, r2, #2
+    cmp r8, #32
+    addge r2, r2, #4
+    cmp r8, #64
+    subge r2, r2, #15 
+    cmp r8, #96
+    addge r2, r2, #4
+    cmp r8, #128
+    addge r2, r2, #5
     add r10, r10, r2
     mov r1, #480       ; 240*2
     mul r2, r1, r9     ; Y position
@@ -1119,7 +1128,7 @@ Death6_Literal: .long Death6_Data
 Death7_Literal: .long Death7_Data
 ;END OF DEATH SPRITES ---------------
 
-VictoryFrog_Data: .incbin "assets/map/finishFrog1.img.bin"
+VictoryFrog_Data: .incbin "assets/map/finishFrog2.img.bin"
 VictoryFrog_Literal: .long VictoryFrog_Data
 
 .align 4
