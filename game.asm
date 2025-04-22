@@ -104,6 +104,23 @@ ProgramStart:
     mov r5, #4
     bl ShowSpriteXor
 
+    mov r4, #62       ; Turtle vertical position (in water area)
+
+    ; First turtle
+    mov r3, #30         ; X position
+    mov r5, #5          ; Use sprite type 5 for turtle
+    bl ShowSpriteXor
+
+    ; Second turtle
+    mov r3, #46         ; X position
+    mov r5, #5          ; Use sprite type 5 for turtle
+    bl ShowSpriteXor
+
+    ; Third turtle
+    mov r3, #62       ; X position
+    mov r5, #5          ; Use sprite type 5 for turtle
+    bl ShowSpriteXor
+
 MoveOrGame:
     ldr r12, DataSection_Address  ; Load DataSection address
     ldr r0, [r12, #12]  ; Vcount_Ptr
@@ -522,18 +539,75 @@ DontWrapValue315:
 
 SkipCollisionLane3:
 NoCollision32:
-    ; Check for water death (y position between 16 and 64)
-    ;cmp r9, #64
-    ;bgt SkipWaterCheck    ; If y > 64, skip water check
-    ;cmp r9, #16
-    ;blt SkipWaterCheck    ; If y < 16, skip water check
+    mov r4, #62       ; Turtle vertical position
 
-    ; We're in water zone - trigger water death
-    ;b WaterDeath
+    ; Clear first turtle
+    ldr r12, DataSection_Address
+    mov r3, #30         ; X position
+    mov r5, #5          ; Use sprite type 5 for turtle
+    bl ShowSpriteXor    ; XOR to clear
+
+    ; Clear second turtle
+    mov r3, #46        ; X position
+    mov r5, #5          ; Use sprite type 5 for turtle
+    bl ShowSpriteXor    ; XOR to clear
+
+    ; Clear third turtle
+    mov r3, #62        ; X position
+    mov r5, #5          ; Use sprite type 5 for turtle
+    bl ShowSpriteXor    ; XOR to clear
+
+    ; Now redraw turtles (possibly with updated positions)
+    mov r4, #62       ; Turtle vertical position
+
+    ; Redraw first turtle
+    ldr r12, DataSection_Address
+    ldr r0, [r12, #68]  ; Turtle1_Ptr
+    ldr r1, [r0]
+    mov r3, #30         ; X position
+    mov r5, #5          ; Use sprite type 5 for turtle
+    bl ShowSpriteXor
+
+    ; Redraw second turtle
+    mov r3, #46        ; X position
+    mov r5, #5          ; Use sprite type 5 for turtle
+    bl ShowSpriteXor
 
 SkipWaterCheck:
-    cmp r9, #6
-    bne SkipVictoryCheck
+    cmp r9, #64
+    bgt SkipVictoryCheck    ; If y > 64, skip water check
+    cmp r9, #16
+    blt SkipVictoryCheck    ; If y < 16, skip water check
+
+    ; We're in water zone - check if on a turtle before triggering death
+    cmp r9, #62             ; Check if at turtle row (y=62)
+    bne WaterDeath          ; If not on turtle row, it's water death
+
+    ; Check if frog is on any of the three turtles
+    ; First turtle: x=30 to x=45
+    cmp r8, #30
+    blt CheckSecondTurtle   ; Less than turtle 1 start
+    cmp r8, #45
+    ble OnTurtle            ; On turtle 1
+
+CheckSecondTurtle:
+    ; Second turtle: x=46 to x=61
+    cmp r8, #46
+    blt CheckThirdTurtle    ; Less than turtle 2 start
+    cmp r8, #61
+    ble OnTurtle            ; On turtle 2
+
+CheckThirdTurtle:
+    ; Third turtle: x=62 to x=77
+    cmp r8, #62
+    blt WaterDeath          ; Less than turtle 3 start
+    cmp r8, #77
+    ble OnTurtle            ; On turtle 3
+    b WaterDeath            ; Not on any turtle
+
+OnTurtle:
+    ; Frog is safely on a turtle, continue game
+    b SkipVictoryCheck
 SkipVictoryCheck:
     ; Check if frog has reached the top row where victory zones are
     cmp r9, #6
@@ -1033,30 +1107,41 @@ ShowSpriteXor:
     mul   r2, r1, r4          ; r2 = y coordinate * 480
     add   r10, r10, r2        ; add Y offset
 
-    ; Load car sprite address from CarThird_Literal
-	cmp   r5, #1
+    ; Save DataSection_Address before using r12 for other purposes
+    mov   r7, r12             ; Save DataSection_Address in r7
+
+    ; Load sprite address based on type in r5
+    cmp   r5, #1
     bne   NotSecond
     adr   r2, CarFirst_Literal
     b     AfterCarLoad
+
     NotSecond:
     cmp   r5, #3
     bne   NotThird
     adr   r2, CarThird_Literal
     b     AfterCarLoad
+
     NotThird:
     cmp   r5, #4
-    bne   NotFirst
+    bne   NotFourth
     adr   r2, CarFourth_Literal
     b     AfterCarLoad
-    NotFirst:
-    ; Fallback/default
+
+    NotFourth:
+    cmp   r5, #5
+    bne   NotTurtle
+    ldr   r2, [r12,#68]  ; Use the literal directly instead of accessing through r12
+    b     AfterCarLoad
+
+    NotTurtle:
+    ; Fallback/default for any other sprite type
     ldr   r2, CarFirst_Literal
 
     AfterCarLoad:
     ldr   r1, [r2]
 
     mov   r6, #16             ; Height = 16 lines
-
 Sprite_NextLineXor:
     mov   r5, #16             ; Width = 16 pixels per row
     mov   r7, #0              ; Reset column counter for this row
@@ -1109,6 +1194,10 @@ Death5_Data: .incbin "assets/death/death5.img.bin"
 Death6_Data: .incbin "assets/death/death6.img.bin"
 Death7_Data: .incbin "assets/death/death7.img.bin"
 
+Turtle1_Data: .incbin "assets/river/turtles/turtle1.img.bin"
+Turtle1_Literal: .long Turtle1_Data
+
+
 ; Add pointers to the death animation frames
 Death1_Literal: .long Death1_Data
 Death2_Literal: .long Death2_Data
@@ -1124,23 +1213,24 @@ VictoryFrog_Literal: .long VictoryFrog_Data
 
 .align 4
 DataSection:
-    CurrentFrame_Ptr:   .long 0x03000000
-    Delay_Ptr:         .long 0x03005C00
-    GameLogicFlag_Ptr: .long 0x03004A00
-    Vcount_Ptr:        .long 0x04000006
-    PreviousInput_Ptr: .long 0x03007F00
-    FirstObjectPosition:  .long 0x03000F28
-    SecondObjectPosition: .long 0x03000004
-    ThirdObjectPosition:  .long 0x03000008
-    FourthObjectPosition: .long 0x0300000C
-    FifthObjectPosition:  .long 0x03000010
-    SixthObjectPosition:  .long 0x03000014
-    SeventhObjectPosition:.long 0x03000018
-    EighthObjectPosition: .long 0x0300001C
-    NinthObjectPosition:  .long 0x03000020
-    TenthObjectPosition:  .long 0x03000024
-    BackgroundData_Ptr:   .long BackgroundData
-    VictoryFrog_Ptr:      .long VictoryFrog_Data
+    CurrentFrame_Ptr:   .long 0x03000000 ;0
+    Delay_Ptr:         .long 0x03005C00 ;4
+    GameLogicFlag_Ptr: .long 0x03004A00 ;8
+    Vcount_Ptr:        .long 0x04000006 ;12
+    PreviousInput_Ptr: .long 0x03007F00 ;16
+    FirstObjectPosition:  .long 0x03000F28  ;20
+    SecondObjectPosition: .long 0x03000004  ;24
+    ThirdObjectPosition:  .long 0x03000008  ;28
+    FourthObjectPosition: .long 0x0300000C  ;32
+    FifthObjectPosition:  .long 0x03000010  ;36
+    SixthObjectPosition:  .long 0x03000014  ;40
+    SeventhObjectPosition:.long 0x03000018  ;44
+    EighthObjectPosition: .long 0x0300001C  ;48
+    NinthObjectPosition:  .long 0x03000020  ;52
+    TenthObjectPosition:  .long 0x03000024  ;56
+    BackgroundData_Ptr:   .long BackgroundData  ;60
+    VictoryFrog_Ptr:      .long VictoryFrog_Data    ;64
+    Turtle1_Ptr: .long Turtle1_Literal ;68
 
 
 FrogNorth_Data: .incbin "assets/frogs/frogNorth.img.bin"
