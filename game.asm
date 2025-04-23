@@ -136,6 +136,57 @@ ProgramStart:
     mov r3, #62       ; X position
     mov r5, #6          ; Use sprite type 5 for turtle
     bl ShowSpriteXor
+	
+	;First log
+	mov r4, #48            ;Log 1 vertical pos
+
+    mov r3,#-48
+    mov r5, #7
+    bl ShowSpriteXor
+	
+	
+	;second log
+    mov r0, #-48
+    ldr r1, [r12, #36]  ; FifthObjectPosition
+    mov r3,r0, asl #8
+    str r3,[r1]
+    mov r3, #52			;x pos of car offset
+    mov r5, #7
+    bl ShowSpriteXor
+	
+	;Third log
+	mov r4, #34            ;Log 1 vertical pos
+
+    mov r3,#-64
+    mov r5, #8
+    bl ShowSpriteXor
+	
+	
+	;fourth log
+    mov r0, #-64
+    ldr r1, [r12, #40]  ; FifthObjectPosition
+    mov r3,r0, asl #8
+    str r3,[r1]
+    mov r3, #68			;x pos of car offset
+    mov r5, #8
+    bl ShowSpriteXor
+	
+	;fifth log
+	mov r4, #20
+	mov r0, #-48
+	mov r3,#-48
+	mov r5, #9
+	bl ShowSpriteXor
+	
+	;sixth log
+    mov r0, #-48
+	ldr r1, [r12, #44]  ; SixthObjectPosition
+    mov r3,r0, asl #8
+    str r3,[r1]	
+	mov r3, #-48+102
+	mov r5,#7
+	bl ShowSpriteXor
+	
 
 MoveOrGame:
     ldr r12, DataSection_Address  ; Load DataSection address
@@ -264,7 +315,7 @@ AfterDirectionCheck:
     bl ShowSprite       ; This will use current r6 value for direction
 
     ; Increase the delay for jump frame
-    mov r0,#0x8FFF     ; Increased from 0x5FFF to 0x8FFF
+    mov r0,#0x1FFF     ; Increased from 0x5FFF to 0x8FFF
 Delay1:
     subs r0,r0,#1
     bne Delay1
@@ -619,6 +670,8 @@ DontWrapValue224:
     ble NoCollision124   ; no collision
 
     b Death             ; Collision occurred
+	
+
 NoCollision124:
     ldr r12, DataSection_Address
     ldr r0, [r12, #32]  ; FourthObjectPosition
@@ -640,10 +693,168 @@ DontWrapValue11524:
 
     b Death             ; Collision occurred
 
+	
+
 SkipCollisionLane124:
 NoCollision224:
 
-NoCollision323:
+;MOVE LOG LANE 2 RENDER log
+	mov r4, #48       ; log 1 vertical pos
+
+    ldr r12, DataSection_Address
+    ldr r0, [r12, #36]  ; FifthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8
+    mov r5, #7
+    bl ShowSpriteXor    ; derender sprite1
+	
+
+    ldr r0, [r12, #36]  ; FifthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    add r3, r3, #-98   ; second car offset
+    cmp r3, #-48        ; less than -16 for left
+    bgt DontWrapValue27
+    add r3, r3, #198   ; add
+DontWrapValue27:
+    mov r5, #7
+    bl ShowSpriteXor    ; derender sprite2
+	
+
+
+    ldr r0, [r12, #36]  ; FifthObjectPosition
+    ldr r1, [r0]
+    add r1, r1, #-150   ; add subpixel, now -
+    mov r3, r1, asr #8  ; get pixel
+
+    cmp r3, #-48        ; wrap around, from left
+    bgt KeepValue27
+    add r3, r3, #198    ; add for left
+    mov r1, r3, lsl #8
+KeepValue27:
+    str r1, [r0]
+    mov r5, #7
+    bl ShowSpriteXor    ; render sprite1
+
+
+    ldr r0, [r12, #36]  ; FifthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    add r3, r3, #-98   ; second car offset
+    cmp r3, #-48        ; -16
+    bgt DontWrapValue227
+    add r3, r3, #198    ; add
+DontWrapValue227:
+    mov r5, #7
+    bl ShowSpriteXor    ; render sprite 2
+
+;LOG LANE 2 END
+;LOG LANE 3 START
+	mov r4, #34      ; log 1 vertical pos
+
+    ldr r12, DataSection_Address
+    ldr r0, [r12, #40]  ; FifthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8
+    mov r5, #8
+    bl ShowSpriteXor    ; derender sprite1
+	
+
+    ldr r0, [r12, #40]  ; FifthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    add r3, r3, #-82   ; second car offset
+    cmp r3, #-64       ; less than -16 for left
+    bgt DontWrapValue27rd
+    add r3, r3, #214   ; add
+DontWrapValue27rd:
+    mov r5, #8
+    bl ShowSpriteXor    ; derender sprite2
+	
+
+
+    ldr r0, [r12, #40]  ; FifthObjectPosition
+    ldr r1, [r0]
+    add r1, r1, #-200   ; add subpixel, now -
+    mov r3, r1, asr #8  ; get pixel
+
+    cmp r3, #-64        ; wrap around, from left
+    bgt KeepValue27rd
+    add r3, r3, #214    ; add for left
+    mov r1, r3, lsl #8
+KeepValue27rd:
+    str r1, [r0]
+    mov r5, #8
+    bl ShowSpriteXor    ; render sprite1
+
+
+    ldr r0, [r12, #40]  ; FifthObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    add r3, r3, #-82   ; second car offset
+    cmp r3, #-64        ; -16
+    bgt DontWrapValue227rd
+    add r3, r3, #214    ; add
+DontWrapValue227rd:
+    mov r5, #8
+    bl ShowSpriteXor    ; render sprite 2
+
+	
+;LOG LANE 3 END
+
+;LOG LANE 4 START
+
+;LANE 3 FIRST RENDER (Moving right like Lane 1)
+    mov r4, #20        ; CAR 3 vertical pos
+
+    ldr r12, DataSection_Address
+    ldr r0, [r12, #44]  ; ThirdObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8
+    mov r5, #9          ; Use car sprite 4
+
+    bl ShowSpriteXor    ; derender sprite1
+
+    ldr r0, [r12, #44]  ; ThirdObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    add r3, r3, #102     ; second car offset
+    cmp r3, #150
+    blt DontWrapValue39
+    sub r3, r3, #198
+DontWrapValue39:
+    mov r5, #7
+    bl ShowSpriteXor    ; derender sprite2
+
+    ldr r0, [r12, #44]  ; ThirdObjectPosition
+    ldr r1, [r0]
+    add r1, r1, #150     ; add subpixel (slightly faster than lane 1)
+    mov r3, r1, asr #8  ; get pixel
+
+    cmp r3, #150        ; wrap around
+    ble KeepValue39
+    sub r3, r3, #198
+    mov r1, r3, lsl #8
+KeepValue39:
+    str r1, [r0]
+    mov r5, #9
+
+    bl ShowSpriteXor    ; render sprite1
+    ldr r0, [r12, #44]  ; ThirdObjectPosition
+    ldr r1, [r0]
+    mov r3, r1, asr #8  ; get pixel
+    add r3, r3, #102
+    cmp r3, #150
+    ble DontWrapValue319
+    sub r3, r3, #198
+DontWrapValue319:
+    mov r5, #7
+    bl ShowSpriteXor    ; render sprite 2
+
+;LOG LANE 4 END
+
+Render_Turtles:
+	b LogCollisionCheck
     mov r4, #62       ; Turtle vertical position
 
     ; Clear first turtle
@@ -677,8 +888,140 @@ NoCollision323:
     mov r3, #46        ; X position
     mov r5, #6          ; Use sprite type 6 for turtle
     bl ShowSpriteXor
+	
+	
+LogCollisionCheck:
+    cmp r9, #62
+    beq SkipWaterCheck          ; e.g. this might be a safe lily pad row
 
+    cmp r9, #48                 ; Check if we're in the first log lane
+    bne CheckLane2Log
+
+    ; === LOG 1 CHECK ===
+    ldr r0, [r12, #36]          ; Log 1 object
+    ldr r1, [r0]                ; Get its position
+    mov r3, r1, asr #8          ; Extract pixel X coordinate
+    mov r4, r3                  ; r4 = Log1.X
+    add r5, r4, #40             ; r5 = Log1.X + log width + margin
+
+    cmp r5, r8                  ; if (Log1.X + 54 <= Frog.X)
+    ble CheckLog2              ; Not on log1, try log2
+
+    add r6, r8, #12             ; r6 = Frog.X + width
+    cmp r6, r4                  ; if (Frog.X + 12 <= Log1.X)
+    ble CheckLog2              ; Not on log1, try log2
+
+    b SkipVictoryCheck            ; On Log1 — safe!
+
+CheckLog2:
+    ; === LOG 2 CHECK ===
+    ; Log2 = Log1 - 98 (with wrapping)
+    sub r4, r4, #98             ; Get log2.x
+    cmp r4, #-48                ; If wrap around
+    bgt NoWrapLog2
+    add r4, r4, #198            ; Extra wrap handling (adjust if needed)
+
+NoWrapLog2:
+    mov r3, r4
+    add r5, r3, #40             ; r5 = Log2.X + log width + margin
+
+    cmp r5, r8                  ; if (Log2.X + 54 <= Frog.X)
+    ble WaterDeath              ; Not on log2 either
+
+    add r6, r8, #12             ; Frog.X + width
+    cmp r6, r3                  ; if (Frog.X + 12 <= Log2.X)
+    ble WaterDeath              ; Not on log2 either
+
+    b SkipVictoryCheck            ; On Log2 — safe!
+
+; Continue to other lanes if needed...
+	
+
+
+	CheckLane2Log:	
+	cmp r9, #34			;FOR SECOND LANE OF LOGS
+	bne CheckLane3Log
+
+	; === LOG 1 CHECK ===
+    ldr r0, [r12, #40]          ; Log 1 object
+    ldr r1, [r0]                ; Get its position
+    mov r3, r1, asr #8          ; Extract pixel X coordinate
+    mov r4, r3                  ; r4 = Log1.X
+    add r5, r4, #50             ; r5 = Log1.X + log width + margin
+
+    cmp r5, r8                  ; if (Log1.X + 54 <= Frog.X)
+    ble CheckLog22              ; Not on log1, try log2
+
+    add r6, r8, #12             ; r6 = Frog.X + width
+    cmp r6, r4                  ; if (Frog.X + 12 <= Log1.X)
+    ble CheckLog22             ; Not on log1, try log2
+
+    b SkipVictoryCheck            ; On Log1 — safe!
+
+CheckLog22:
+    ; === LOG 2 CHECK ===
+    ; Log2 = Log1 - 98 (with wrapping)
+    sub r4, r4, #82             ; Get log2.x
+    cmp r4, #-64                ; If wrap around
+    bgt NoWrapLog22
+    add r4, r4, #214            ; Extra wrap handling (adjust if needed)
+
+NoWrapLog22:
+    mov r3, r4
+    add r5, r3, #50             ; r5 = Log2.X + log width + margin
+
+    cmp r5, r8                  ; if (Log2.X + 54 <= Frog.X)
+    ble WaterDeath              ; Not on log2 either
+
+    add r6, r8, #12             ; Frog.X + width
+    cmp r6, r3                  ; if (Frog.X + 12 <= Log2.X)
+    ble WaterDeath              ; Not on log2 either
+
+    b SkipVictoryCheck            ; On Log2 — safe!
+
+	CheckLane3Log:
+	cmp r9, #20			;FOR THIRD LANE OF LOGS
+	bne SkipVictoryCheck
+	; === LOG 1 CHECK ===
+    ldr r0, [r12, #44]          ; Log 1 object
+    ldr r1, [r0]                ; Get its position
+    mov r3, r1, asr #8          ; Extract pixel X coordinate
+    mov r4, r3                  ; r4 = Log1.X
+    add r5, r4, #26             ; r5 = Log1.X + log width + margin
+
+    cmp r5, r8                  ; if (Log1.X + 54 <= Frog.X)
+    ble CheckLog23              ; Not on log1, try log2
+
+    add r6, r8, #12             ; r6 = Frog.X + width
+    cmp r6, r4                  ; if (Frog.X + 12 <= Log1.X)
+    ble CheckLog23             ; Not on log1, try log2
+
+    b SkipVictoryCheck            ; On Log1 — safe!
+
+CheckLog23:
+    ; === LOG 2 CHECK ===
+    ; Log2 = Log1 - 98 (with wrapping)
+    add r4, r4, #102             ; Get log2.x
+    cmp r4, #150                ; If wrap around
+    blt NoWrapLog23
+    sub r4, r4, #198           ; Extra wrap handling (adjust if needed)
+
+NoWrapLog23:
+    mov r3, r4
+    add r5, r3, #40             ; r5 = Log2.X + log width + margin
+
+    cmp r5, r8                  ; if (Log2.X + 54 <= Frog.X)
+    ble WaterDeath              ; Not on log2 either
+
+    add r6, r8, #12             ; Frog.X + width
+    cmp r6, r3                  ; if (Frog.X + 12 <= Log2.X)
+    ble WaterDeath              ; Not on log2 either
+
+    b SkipVictoryCheck            ; On Log2 — safe!
+	
+	
 SkipWaterCheck:
+	;b SkipVictoryCheck
     cmp r9, #64
     bgt SkipVictoryCheck    ; If y > 64, skip water check
     cmp r9, #16
@@ -686,7 +1029,7 @@ SkipWaterCheck:
 
     ; We're in water zone - check if on a turtle before triggering death
     cmp r9, #62             ; Check if at turtle row (y=62)
-    bne WaterDeath          ; If not on turtle row, it's water death
+    bne SkipVictoryCheck          ; If not on turtle row, it's water death
 
     ; Check if frog is on any of the three turtles
     ; First turtle: x=30 to x=45
@@ -1228,8 +1571,40 @@ ShowSpriteXor:
     cmp   r5, #1
 
 
+	cmp r5, #9
+	bne NotLog3
+	adr r2,Log_wide2_Literal
+	mov r0,#32
+	b AfterCarLoad
+	
+Log_wide2_Literal: 	.long Log_wide2_Literal
+Log_Wide2_Data:		.incbin "assets/river/log_wide2.img.bin"
+	
+NotLog3:
+	
+	cmp r5,#8
+	bne NotLog2
+	adr r2, Log_wide4_Literal
+	mov r0,#64
+	b AfterCarLoad
+	
+Log_wide4_Literal:	.long Log_wide4_Data
+Log_wide4_Data:		.incbin "assets/river/log_wide4.img.bin"
 
+	
+NotLog2:
 
+	
+	cmp r5,#7
+	bne NotLog1
+	adr r2, Log_wide3_Literal
+	mov r0,#48
+	b AfterCarLoad
+	
+Log_wide3_Literal:	.long Log_wide3_Data
+Log_wide3_Data:		.incbin "assets/river/log_wide3.img.bin"
+
+	NotLog1:
     ; Load car sprite address from CarThird_Literal
 	cmp   r5, #1
     bne   NotSecond
@@ -1312,7 +1687,7 @@ Sprite_NextByteXor:
     blt   SkipPixelXor        ; If negative, skip drawing this pixel
     cmp   r2, #148            ; Check if absolute x is above 148
     bgt   SkipPixelXor        ; If so, skip drawing this pixel
-    ldrH  r3, [r1], #2        ; load one halfword (pixel) from car sprite data; advance pointer
+    ldrH  r3, [r1], #2      ; load one halfword (pixel) from car sprite data;
     ldrH  r2, [r10]           ; load current VRAM pixel value at destination
     eor   r3, r3, r2          ; XOR the sprite pixel with the background pixel
     strH  r3, [r10], #2       ; store result back to VRAM; advance destination pointer
@@ -1409,3 +1784,5 @@ FrogEastJump_Literal:  .long FrogEastJump_Data
 FrogWestJump_Literal:  .long FrogWestJump_Data
 
 BackgroundData: .incbin "assets/smallmap.img.bin"
+
+;end
