@@ -51,12 +51,21 @@ ProgramStart:
 
     bl LoadBackground
 
-    mov r8,#62
-    mov r9,#146
-    and r8, r8, #0xFF
+	;testing 
+		;mov r8,#62			;frog horizontal
+		;mov r9,#146	
+		;bl SaveBackground
+		;mov r8,#30			;frog horizontal
+		;mov r9,#30
+		;bl LoadTempBackground
+	;end of testing
+	
+    mov r8,#62			;frog horizontal
+    mov r9,#146			;frog verticant
+    and r8, r8, #0xFF	;lower 2 bytes
     and r9, r9, #0xFF
     mov r6,#0 ; direction: 0=North, 1=South, 2=West, 3=East
-
+	bl SaveBackground
     bl ShowSprite
 
     ;LANE 1 FIRST RENDER
@@ -240,11 +249,11 @@ WaitNoInput:
     strh r1, [r0]       ; update PreviousInput
 
     ; If nothing is newly pressed, go back
-    ; Check: r1 == 0 → no buttons pressed → go to MoveOrGame
+    ; Check: r1 == 0  no buttons pressed  go to MoveOrGame
     cmp r1, #0
     beq MoveOrGame
 
-    ; Check if current input equals previous input → still holding → skip
+    ; Check if current input equals previous input  still holding → skip
     cmp r1, r2
     beq MoveOrGame
 
@@ -252,16 +261,10 @@ WaitNoInput:
     mov r0, r1          ; pass current input in r0 if needed
     b DirectionChecks
 
-WaitForInput:
-    ldrh r1, [r3]
-    mov r0, r1
-    and r0, r0, #0b0000000011110000
-    cmp r0, #0b0000000011110000
-    ;beq WaitForInput   ; Wait until a direction is pressed
-    beq MoveOrGame      ; same ol same ol
 
 DirectionChecks:
     bl RemoveSprite
+	bl LoadTempBackground
 
     ldrh r1, [r3]
     mov r0, r1
@@ -304,9 +307,9 @@ CheckRight:
     mov r6, #3          ; East
 
 AfterDirectionCheck:
-    ; Remove old sprite first
-    bl RemoveSprite
-
+    
+	bl SaveBackground
+	
     ; Set jump frame for movement
     ldr r12, DataSection_Address
     ldr r4, [r12, #0]   ; CurrentFrame_Ptr
@@ -315,15 +318,17 @@ AfterDirectionCheck:
     bl ShowSprite       ; This will use current r6 value for direction
 
     ; Increase the delay for jump frame
-    mov r0,#0x1FFF     ; Increased from 0x5FFF to 0x8FFF
+    mov r0,#0x4FFF     ; Increased from 0x5FFF to 0x8FFF
 Delay1:
     subs r0,r0,#1
     bne Delay1
+	;b MoveOrGame		;for testing purposes, skip the jump animation, only load jump frame
+
 
 JumpAnimation:
     ; Remove jump frame sprite
     bl RemoveSprite
-
+	bl LoadTempBackground
     ; Reset to normal frame
     ldr r12, DataSection_Address
     ldr r4, [r12, #0]   ; CurrentFrame_Ptr
@@ -332,7 +337,7 @@ JumpAnimation:
     bl ShowSprite       ; This will use current r6 value for direction
 
     ; Increase delay before next input
-    mov r0,#0x2FFF     ; Increased from 0x1AFF to 0x2FFF
+    mov r0,#0x0001     ; Increased from 0x1AFF to 0x2FFF
     ldr r12, DataSection_Address
     ldr r1, [r12, #4]   ; Delay_Ptr
     str r0, [r1]
@@ -392,6 +397,10 @@ KeepValue:
 DontWrapValue11:
     mov r5, #3
     bl ShowSpriteXor    ; render sprite 2
+	
+	;collision check for lane 1 of cars
+	
+	;b NoCollision2		skips collision check for this car lane
 
     cmp r9, #132        ; frog vertical position equal to only possible position in this lane
     bne SkipCollisionLane1
@@ -1174,6 +1183,7 @@ VictoryDelayInner:
     mov r6, #0          ; Face north
 
     ; Show sprite at starting position
+	
     bl ShowSprite
 
     LDMFD sp!, {r0-r7, pc}
@@ -1402,6 +1412,81 @@ BackgroundCopy:
 
 ;FROG RENDER START ----------------------------
 
+;EXPERIMENTAL, save what should be behind the frog, so it can later be rendered before showsprite movement of a frog
+;in showsprite, before rendering each pixel, save the background pixel and increment it
+;in removesprite, render what was before
+;would need a new showsprite function for the old background
+;cant we just store the old background in vblank somewhere? - TODO
+;End of experimental
+
+
+SaveBackground:
+	;mov r0,  #0x06002C00	;vblank?
+	STMFD sp!, {r0-r10}
+
+	mov r0,  #0x06013C00	;vblank
+	mov r10, #0x06000000	;vram start
+    mov r1, #2				;number 2
+    mul r2, r1, r8			;r8 is frog horizontal, r2=2*f.x, since pixels are 2 bytes, we mult horizontal by 2 
+    add r10, r10, r2		;move position in r10 by horizontal offset
+    mov r1, #240*2			;r1=480
+    mul r2, r1, r9			;move position in r10 by vertical offset. r9 is vertical pos, 240*2 is line width *2 bytes per pixel
+    add r10, r10, r2		;add the 2 numbers together to get final vram position of frog
+	
+	mov r4,#16         		;sprite height
+SaveBackground_NextLine:
+    mov r5,#16				;sprite width
+    STMFD sp!,{r10}			;evil stack magic
+SaveBackground_NextByte:
+    ;ldrH r3,[r1],#2			;load pixel from sprite, r1 should hold sprite 
+    ;strH r3,[r10]			;store pixel from r3 (sprite data) into vram pointer 
+	ldrH r3,[r10]			;load pixel from r10 pointer in r3
+	strH r3, [r0]			;store r3 pixel in r6 vblank
+	add r0,r0,#2			;move vblank by 2
+    add r10,r10,#2			;move pointer by 2 bytes
+    subs r5,r5,#1			;decrease how many pixels in width are left
+    bne SaveBackground_NextByte	;if at the horizontal end go to next line
+    LDMFD sp!,{r10}			;stack magic
+    add r10,r10,#240*2		;move by one line
+    subs r4,r4,#1      		;decrease how many lines are left 
+    bne SaveBackground_NextLine	;if there are still left, go to next line
+	LDMFD sp!, {r0-r10}
+
+    mov pc,lr				;donezo bro
+
+;LOADBACKGROUND
+
+LoadTempBackground:
+	;mov r0,  #0x06002C00	;test
+	STMFD sp!, {r0-r10}
+	mov r0,  #0x06013C00	;vblank?
+	mov r10, #0x06000000	;vram start
+    mov r1, #2				;number 2
+    mul r2, r1, r8			;r8 is frog horizontal, r2=2*f.x, since pixels are 2 bytes, we mult horizontal by 2 
+    add r10, r10, r2		;move position in r10 by horizontal offset
+    mov r1, #240*2			;r1=480
+    mul r2, r1, r9			;move position in r10 by vertical offset. r9 is vertical pos, 240*2 is line width *2 bytes per pixel
+    add r10, r10, r2		;add the 2 numbers together to get final vram position of frog
+	
+	mov r4,#16         		;sprite height
+LoadBackground_NextLine:
+    mov r5,#16				;sprite width
+    STMFD sp!,{r10}			;evil stack magic
+LoadBackground_NextByte:
+	ldrH r3, [r0]			;load r3 pixel in r0 vblank
+	strH r3,[r10]			;store pixel from r10 pointer in r3
+	add r0,r0,#2			;move vblank by 2
+    add r10,r10,#2			;move pointer by 2 bytes
+    subs r5,r5,#1			;decrease how many pixels in width are left
+    bne LoadBackground_NextByte	;if at the horizontal end go to next line
+    LDMFD sp!,{r10}			;stack magic
+    add r10,r10,#240*2		;move by one line
+    subs r4,r4,#1      		;decrease how many lines are left 
+    bne LoadBackground_NextLine	;if there are still left, go to next line
+	LDMFD sp!, {r0-r10}
+    mov pc,lr				;donezo bro
+	
+	
 ShowSprite:
     mov r10, #0x06000000
     mov r1, #2
@@ -1514,39 +1599,44 @@ Sprite_SkipPixel:
     mov pc,lr
 
 RemoveSprite:
-    STMFD sp!, {r0-r7, lr}
-    mov r10,#0x06000000
-    mov r1,#2
-    mul r2,r1,r8
-    add r10,r10,r2
-    mov r1,#240*2
-    mul r2,r1,r9
-    add r10,r10,r2
-    ldr r0, [r12,#60]
-    mov r1, r9
-    mov r2, #240
-    mul r3, r1, r2
-    add r3, r3, r8
-    mov r2, #2
-    mul r3, r2, r3
-    add r0, r0, r3
-    mov r4, #16        ; Changed from r6 to r4 for the counter
+    STMFD sp!, {r0-r7, lr}        ; Save registers r0-r7 and the link register (lr) onto the stack
+    mov r10, #0x06000000          ; Load the base address of VRAM (0x06000000) into r10
+    mov r1, #2                    ; Set r1 to 2 (bytes per pixel, 16-bit color)
+    mul r2, r1, r8                ; r2 = bytes_per_pixel * x_coordinate (r8)
+    add r10, r10, r2              ; Advance VRAM address horizontally by x offset
+    mov r1, #240*2              ; r1 = bytes per row in VRAM (240 pixels * 2 bytes)
+    mul r2, r1, r9                ; r2 = row_size * y_coordinate (r9)
+    add r10, r10, r2              ; Advance VRAM address vertically by y offset
+    ldr r0, [r12, #60]            ; Load pointer to background data (sprite sheet) from data section
+    mov r1, r9                    ; Move y-coordinate into r1
+    mov r2, #240                  ; r2 = number of pixels per row in sprite (240)
+    mul r3, r1, r2                ; r3 = y * width to get sprite row index
+    add r3, r3, r8                ; r3 = row_index + x to get pixel index in sprite
+    mov r2, #2                    ; r2 = bytes per pixel
+    mul r3, r2, r3                ; r3 = byte offset into sprite data
+    add r0, r0, r3                ; Compute sprite data address for first pixel of row
+    mov r4, #16                   ; r4 = row counter (sprite height in pixels)
+
 RemoveSprite_NextLine:
-    mov r5, #16
-    STMFD sp!,{r10, r0}
+    mov r5, #16                   ; r5 = column counter (sprite width in pixels)
+    STMFD sp!, {r10, r0}          ; Save current VRAM (r10) and sprite data (r0) pointers
+
 RemoveSprite_NextByte:
-    ldrH r3,[r0],#2
-    strH r3,[r10],#2
-    subs r5,r5,#1
-    bne RemoveSprite_NextByte
-    LDMFD sp!,{r10, r0}
-    add r10,r10,#240*2
-    add r0, r0, #240*2
-    subs r4,r4,#1      ; Changed from r6 to r4
-    bne RemoveSprite_NextLine
-    LDMFD sp!, {r0-r7, pc}
+    ldrh r3, [r0], #2             ; Load 16-bit pixel from sprite and post-increment sprite pointer by 2
+    strh r3, [r10], #2            ; Store pixel to VRAM and post-increment VRAM pointer by 2
+    subs r5, r5, #1               ; Decrement column counter
+    bne RemoveSprite_NextByte     ; Repeat for all columns in the row
+
+    LDMFD sp!, {r10, r0}          ; Restore VRAM and sprite pointers for next row
+    add r10, r10, #240*2        ; Advance VRAM pointer to start of next row (240*2 bytes)
+    add r0, r0, #240*2            ; Advance sprite data pointer to next row
+    subs r4, r4, #1               ; Decrement row counter
+    bne RemoveSprite_NextLine     ; Repeat for all rows in the sprite
+
+    LDMFD sp!, {r0-r7, pc}        ; Restore registers and return from the function
 
 ;FROG RENDER END ----------------------------
+
 
 ;CAR RENDER 16x16 START ---------------------
 
@@ -1687,7 +1777,7 @@ Sprite_NextByteXor:
     blt   SkipPixelXor        ; If negative, skip drawing this pixel
     cmp   r2, #148            ; Check if absolute x is above 148
     bgt   SkipPixelXor        ; If so, skip drawing this pixel
-    ldrH  r3, [r1], #2      ; load one halfword (pixel) from car sprite data;
+    ldrH  r3, [r1], #2    	  ; load one halfword (pixel) from car sprite data;
     ldrH  r2, [r10]           ; load current VRAM pixel value at destination
     eor   r3, r3, r2          ; XOR the sprite pixel with the background pixel
     strH  r3, [r10], #2       ; store result back to VRAM; advance destination pointer
@@ -1757,6 +1847,7 @@ DataSection:
     TenthObjectPosition:  .long 0x03000024
     BackgroundData_Ptr:   .long BackgroundData	;60
 	VictoryFrog_Ptr:      .long VictoryFrog_Data    ;64
+	;Behind_Frog:		  .long 0x03000030
     ;Turtle1_Ptr: .long Turtle1_Literal ;68
 
 	;CarBig_Literal:			.long CarBig_Data
