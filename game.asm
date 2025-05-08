@@ -313,6 +313,7 @@ AfterDirectionCheck:
     ; Set jump frame for movement
     ldr r12, DataSection_Address
     ldr r4, [r12, #0]   ; CurrentFrame_Ptr
+	
     mov r7, #1
     strb r7, [r4]
     bl ShowSprite       ; This will use current r6 value for direction
@@ -710,6 +711,17 @@ NoCollision224:
 ;MOVE LOG LANE 2 RENDER log
 	mov r4, #48       ; log 1 vertical pos
 
+	ldr r0, [r12, #36]  ; FifthObjectPosition
+    ldr r1, [r0]
+	;test start - add moving for frog on this log lane by copying subpixel and doing add same as log
+	cmp r9, #48
+	bne FrogNotLog2
+	bl RemoveSprite
+	bl LoadTempBackground
+	
+	FrogNotLog2:
+	;test end
+
     ldr r12, DataSection_Address
     ldr r0, [r12, #36]  ; FifthObjectPosition
     ldr r1, [r0]
@@ -718,8 +730,9 @@ NoCollision224:
     bl ShowSpriteXor    ; derender sprite1
 	
 
-    ldr r0, [r12, #36]  ; FifthObjectPosition
-    ldr r1, [r0]
+    
+	ldr r0, [r12, #36]  ; FifthObjectPosition
+	ldr r1, [r0]
     mov r3, r1, asr #8  ; get pixel
     add r3, r3, #-98   ; second car offset
     cmp r3, #-48        ; less than -16 for left
@@ -756,10 +769,36 @@ KeepValue27:
 DontWrapValue227:
     mov r5, #7
     bl ShowSpriteXor    ; render sprite 2
+	;2nd part of testing
+	ldr r0, [r12, #36]  ; FifthObjectPosition
+    ldr r1, [r0]
+	cmp r9, #48
+	bne FrogNotLog2render
+	mov r8,r8,lsl #8
+	mov r0, #0xFF
+	and r1, r1,r0
+	orr r8,r8,r1
+	add r8,r8,#-150
+	mov r8,r8,asr #8
+	bl SaveBackground
+	bl ShowSprite
+	FrogNotLog2render:
 
 ;LOG LANE 2 END
 ;LOG LANE 3 START
 	mov r4, #34      ; log 1 vertical pos
+	
+	;testing
+	ldr r0, [r12, #40]  ; FifthObjectPosition
+    ldr r1, [r0]
+	cmp r9, #34
+	bne FrogNotLog3
+	bl RemoveSprite
+	bl LoadTempBackground
+	
+	FrogNotLog3:
+
+	;testingend
 
     ldr r12, DataSection_Address
     ldr r0, [r12, #40]  ; FifthObjectPosition
@@ -784,7 +823,7 @@ DontWrapValue27rd:
 
     ldr r0, [r12, #40]  ; FifthObjectPosition
     ldr r1, [r0]
-    add r1, r1, #-200   ; add subpixel, now -
+    add r1, r1, #-250   ; add subpixel, now -
     mov r3, r1, asr #8  ; get pixel
 
     cmp r3, #-64        ; wrap around, from left
@@ -807,7 +846,20 @@ KeepValue27rd:
 DontWrapValue227rd:
     mov r5, #8
     bl ShowSpriteXor    ; render sprite 2
-
+	
+	ldr r0, [r12, #40]  ; FifthObjectPosition
+    ldr r1, [r0]
+	cmp r9, #34
+	bne FrogNotLog3render
+	mov r8,r8,lsl #8	;move frog pos 8 bits to left
+	mov r0, #0xFF		;get subpixel amount of log
+	and r1, r1,r0		;continue
+	orr r8,r8,r1		;combine frog pixel and log subpixel
+	add r8,r8,#-250		;movement
+	mov r8,r8,asr #8	;back to start
+	bl SaveBackground
+	bl ShowSprite
+	FrogNotLog3render:
 	
 ;LOG LANE 3 END
 
@@ -815,7 +867,16 @@ DontWrapValue227rd:
 
 ;LANE 3 FIRST RENDER (Moving right like Lane 1)
     mov r4, #20        ; CAR 3 vertical pos
-
+	
+	ldr r0, [r12, #44]  ; FifthObjectPosition
+    ldr r1, [r0]
+	cmp r9, #20
+	bne FrogNotLog4
+	bl RemoveSprite
+	bl LoadTempBackground
+	
+	FrogNotLog4:
+	
     ldr r12, DataSection_Address
     ldr r0, [r12, #44]  ; ThirdObjectPosition
     ldr r1, [r0]
@@ -860,6 +921,20 @@ DontWrapValue319:
     mov r5, #7
     bl ShowSpriteXor    ; render sprite 2
 
+	ldr r0, [r12, #44]  ; FifthObjectPosition
+    ldr r1, [r0]
+	cmp r9, #20
+	bne FrogNotLog4render
+	mov r8,r8,lsl #8
+	mov r0, #0xFF
+	and r1, r1,r0
+	orr r8,r8,r1
+	add r8,r8,#150
+	mov r8,r8,asr #8
+	bl SaveBackground
+	bl ShowSprite
+	FrogNotLog4render:
+	
 ;LOG LANE 4 END
 
 Render_Turtles:
@@ -900,6 +975,11 @@ Render_Turtles:
 	
 	
 LogCollisionCheck:
+	;out of bound death
+	cmp r8,#-4
+	blt WaterDeath
+	cmp r8, #138
+	bgt WaterDeath
     cmp r9, #62
     beq SkipWaterCheck          ; e.g. this might be a safe lily pad row
 
@@ -1183,7 +1263,7 @@ VictoryDelayInner:
     mov r6, #0          ; Face north
 
     ; Show sprite at starting position
-	
+	bl SaveBackground
     bl ShowSprite
 
     LDMFD sp!, {r0-r7, pc}
@@ -1422,7 +1502,7 @@ BackgroundCopy:
 
 SaveBackground:
 	;mov r0,  #0x06002C00	;vblank?
-	STMFD sp!, {r0-r10}
+	STMFD sp!, {r0-r12}
 
 	mov r0,  #0x06013C00	;vblank
 	mov r10, #0x06000000	;vram start
@@ -1450,7 +1530,7 @@ SaveBackground_NextByte:
     add r10,r10,#240*2		;move by one line
     subs r4,r4,#1      		;decrease how many lines are left 
     bne SaveBackground_NextLine	;if there are still left, go to next line
-	LDMFD sp!, {r0-r10}
+	LDMFD sp!, {r0-r12}
 
     mov pc,lr				;donezo bro
 
@@ -1458,7 +1538,7 @@ SaveBackground_NextByte:
 
 LoadTempBackground:
 	;mov r0,  #0x06002C00	;test
-	STMFD sp!, {r0-r10}
+	STMFD sp!, {r0-r12}
 	mov r0,  #0x06013C00	;vblank?
 	mov r10, #0x06000000	;vram start
     mov r1, #2				;number 2
@@ -1483,11 +1563,13 @@ LoadBackground_NextByte:
     add r10,r10,#240*2		;move by one line
     subs r4,r4,#1      		;decrease how many lines are left 
     bne LoadBackground_NextLine	;if there are still left, go to next line
-	LDMFD sp!, {r0-r10}
+	LDMFD sp!, {r0-r12}
     mov pc,lr				;donezo bro
 	
 	
 ShowSprite:
+	STMFD sp!, {r0-r12}
+
     mov r10, #0x06000000
     mov r1, #2
     mul r2, r1, r8
@@ -1497,7 +1579,7 @@ ShowSprite:
     add r10, r10, r2
 
     ; Load current animation frame
-    ldr r12, DataSection_Address
+    ;ldr r12, DataSection_Address
     ldr r4, [r12, #0]   ; CurrentFrame_Ptr
     ldrb r5, [r4]       ; r5 now contains current frame (0 or 1)
 
@@ -1596,10 +1678,11 @@ Sprite_SkipPixel:
     add r10,r10,#240*2
     subs r4,r4,#1      ; Changed from r6 to r4
     bne Sprite_NextLine
+	LDMFD sp!, {r0-r12}
     mov pc,lr
 
 RemoveSprite:
-    STMFD sp!, {r0-r7, lr}        ; Save registers r0-r7 and the link register (lr) onto the stack
+    STMFD sp!, {r0-r12, lr}        ; Save registers r0-r7 and the link register (lr) onto the stack
     mov r10, #0x06000000          ; Load the base address of VRAM (0x06000000) into r10
     mov r1, #2                    ; Set r1 to 2 (bytes per pixel, 16-bit color)
     mul r2, r1, r8                ; r2 = bytes_per_pixel * x_coordinate (r8)
@@ -1633,7 +1716,7 @@ RemoveSprite_NextByte:
     subs r4, r4, #1               ; Decrement row counter
     bne RemoveSprite_NextLine     ; Repeat for all rows in the sprite
 
-    LDMFD sp!, {r0-r7, pc}        ; Restore registers and return from the function
+    LDMFD sp!, {r0-r12, pc}        ; Restore registers and return from the function
 
 ;FROG RENDER END ----------------------------
 
@@ -1877,3 +1960,8 @@ FrogWestJump_Literal:  .long FrogWestJump_Data
 BackgroundData: .incbin "assets/smallmap.img.bin"
 
 ;end
+;possible changes left
+;-Fix a few collisions by changing values to be more accurate
+;-Fix frog orientation on logs
+;-Multiple lives
+;-Time left
